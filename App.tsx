@@ -5,114 +5,131 @@
  * @format
  */
 
-import React from 'react';
-import type {PropsWithChildren} from 'react';
-import {
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  useColorScheme,
-  View,
-} from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, ActivityIndicator } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import auth from '@react-native-firebase/auth';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AuthScreen } from './src/screens/Auth/AuthScreen';
+import { initializeFirebase } from './src/config/firebase';
+import { HomeScreen } from './src/screens/Home/HomeScreen';
+import { FactScreen } from './src/screens/Fact/FactScreen';
 
-import {
-  Colors,
-  DebugInstructions,
-  Header,
-  LearnMoreLinks,
-  ReloadInstructions,
-} from 'react-native/Libraries/NewAppScreen';
+type RootStackParamList = {
+  Auth: undefined;
+  Home: undefined;
+  Fact: {
+    selectedTopics: string[];
+  };
+};
 
-type SectionProps = PropsWithChildren<{
-  title: string;
-}>;
-
-function Section({children, title}: SectionProps): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
-  return (
-    <View style={styles.sectionContainer}>
-      <Text
-        style={[
-          styles.sectionTitle,
-          {
-            color: isDarkMode ? Colors.white : Colors.black,
-          },
-        ]}>
-        {title}
-      </Text>
-      <Text
-        style={[
-          styles.sectionDescription,
-          {
-            color: isDarkMode ? Colors.light : Colors.dark,
-          },
-        ]}>
-        {children}
-      </Text>
-    </View>
-  );
-}
+const Stack = createNativeStackNavigator<RootStackParamList>();
+const AUTH_PERSISTENCE_KEY = '@auth_tokens';
 
 function App(): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
+  const [initializing, setInitializing] = useState(true);
+  const [user, setUser] = useState<any>(null);
 
-  const backgroundStyle = {
-    backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
+  const restoreAuthState = async () => {
+    try {
+      console.log('Attempting to restore auth state...');
+      const storedAuth = await AsyncStorage.getItem(AUTH_PERSISTENCE_KEY);
+      
+      if (storedAuth) {
+        console.log('Found stored auth data');
+        const { idToken, timestamp } = JSON.parse(storedAuth);
+        
+        // Check if token is not too old (1 hour expiry)
+        const now = Date.now();
+        const tokenAge = now - timestamp;
+        const ONE_HOUR = 60 * 60 * 1000;
+        
+        if (tokenAge > ONE_HOUR) {
+          console.log('Stored token is expired, removing...');
+          await AsyncStorage.removeItem(AUTH_PERSISTENCE_KEY);
+          return;
+        }
+
+        if (idToken) {
+          console.log('Attempting to sign in with stored token...');
+          const credential = auth.GoogleAuthProvider.credential(idToken);
+          await auth().signInWithCredential(credential);
+          console.log('Successfully restored auth state');
+        }
+      } else {
+        console.log('No stored auth data found');
+      }
+    } catch (error) {
+      console.error('Error restoring auth state:', error);
+      // Clear stored tokens if they're invalid
+      await AsyncStorage.removeItem(AUTH_PERSISTENCE_KEY);
+    }
   };
 
+  useEffect(() => {
+    const setup = async () => {
+      try {
+        console.log('Initializing app...');
+        await initializeFirebase();
+        
+        // Set up auth state listener
+        const subscriber = auth().onAuthStateChanged(currentUser => {
+          console.log('Auth state changed:', currentUser ? 'User signed in' : 'No user');
+          setUser(currentUser);
+          if (initializing) setInitializing(false);
+        });
+
+        // Then try to restore auth state
+        await restoreAuthState();
+        
+        return subscriber;
+      } catch (error) {
+        console.error('Setup error:', error);
+        setInitializing(false);
+      }
+    };
+    
+    setup();
+  }, []);
+
+  if (initializing) return (
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <ActivityIndicator size="large" />
+    </View>
+  );
+  
   return (
-    <SafeAreaView style={backgroundStyle}>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={backgroundStyle.backgroundColor}
-      />
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        style={backgroundStyle}>
-        <Header />
-        <View
-          style={{
-            backgroundColor: isDarkMode ? Colors.black : Colors.white,
-          }}>
-          <Section title="Step One">
-            Edit <Text style={styles.highlight}>App.tsx</Text> to change this
-            screen and then come back to see your edits.
-          </Section>
-          <Section title="See Your Changes">
-            <ReloadInstructions />
-          </Section>
-          <Section title="Debug">
-            <DebugInstructions />
-          </Section>
-          <Section title="Learn More">
-            Read the docs to discover what to do next:
-          </Section>
-          <LearnMoreLinks />
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+    <NavigationContainer>
+      <Stack.Navigator>
+        {!user ? (
+          <Stack.Screen 
+            name="Auth" 
+            component={AuthScreen} 
+            options={{ headerShown: false }}
+          />
+        ) : (
+          <>
+            <Stack.Screen 
+              name="Home" 
+              component={HomeScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="Fact" 
+              component={FactScreen}
+              options={{ 
+                headerShown: true,
+                title: 'Daily Fact',
+                headerBackTitle: 'Back',
+              }}
+            />
+          </>
+        )}
+      </Stack.Navigator>
+    </NavigationContainer>
   );
 }
-
-const styles = StyleSheet.create({
-  sectionContainer: {
-    marginTop: 32,
-    paddingHorizontal: 24,
-  },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-  },
-  sectionDescription: {
-    marginTop: 8,
-    fontSize: 18,
-    fontWeight: '400',
-  },
-  highlight: {
-    fontWeight: '700',
-  },
-});
 
 export default App;

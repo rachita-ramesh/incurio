@@ -2,6 +2,7 @@ import UIKit
 import React
 import React_RCTAppDelegate
 import ReactAppDependencyProvider
+import Firebase
 
 @main
 class AppDelegate: RCTAppDelegate {
@@ -13,6 +14,8 @@ class AppDelegate: RCTAppDelegate {
     // They will be passed down to the ViewController used by React Native.
     self.initialProps = [:]
 
+    FirebaseApp.configure()
+
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
@@ -22,9 +25,9 @@ class AppDelegate: RCTAppDelegate {
 
   override func bundleURL() -> URL? {
 #if DEBUG
-    RCTBundleURLProvider.sharedSettings().jsBundleURL(forBundleRoot: "index")
+    return URL(string: "http://127.0.0.1:8081/index.bundle?platform=ios")
 #else
-    Bundle.main.url(forResource: "main", withExtension: "jsbundle")
+    return Bundle.main.url(forResource: "main", withExtension: "jsbundle")
 #endif
   }
 }
