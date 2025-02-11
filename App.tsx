@@ -6,6 +6,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { View, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -95,40 +96,44 @@ function App(): React.JSX.Element {
   }, []);
 
   if (initializing) return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-      <ActivityIndicator size="large" />
-    </View>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" />
+      </View>
+    </GestureHandlerRootView>
   );
   
   return (
-    <NavigationContainer>
-      <Stack.Navigator>
-        {!user ? (
-          <Stack.Screen 
-            name="Auth" 
-            component={AuthScreen} 
-            options={{ headerShown: false }}
-          />
-        ) : (
-          <>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <NavigationContainer>
+        <Stack.Navigator>
+          {!user ? (
             <Stack.Screen 
-              name="Home" 
-              component={HomeScreen}
+              name="Auth" 
+              component={AuthScreen} 
               options={{ headerShown: false }}
             />
-            <Stack.Screen 
-              name="Fact" 
-              component={FactScreen}
-              options={{ 
-                headerShown: true,
-                title: 'Daily Fact',
-                headerBackTitle: 'Back',
-              }}
-            />
-          </>
-        )}
-      </Stack.Navigator>
-    </NavigationContainer>
+          ) : (
+            <>
+              <Stack.Screen 
+                name="Home" 
+                component={HomeScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen 
+                name="Fact" 
+                component={FactScreen}
+                options={{ 
+                  headerShown: true,
+                  title: 'Daily Fact',
+                  headerBackTitle: 'Back',
+                }}
+              />
+            </>
+          )}
+        </Stack.Navigator>
+      </NavigationContainer>
+    </GestureHandlerRootView>
   );
 }
 

@@ -10,6 +10,9 @@ import {
 import { factGeneratorService } from '../../services/factGenerator';
 import auth from '@react-native-firebase/auth';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { SwipeableFact } from '../../components/SwipeableFact';
+import { FactConsumedScreen } from '../../components/FactConsumedScreen';
+import { useFocusEffect } from '@react-navigation/native';
 
 type RootStackParamList = {
   Auth: undefined;
@@ -25,6 +28,7 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
   const [fact, setFact] = useState<{ content: string; topic: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [factConsumed, setFactConsumed] = useState(false);
 
   const handleSignOut = async () => {
     try {
@@ -49,6 +53,7 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
     try {
       setLoading(true);
       setError(null);
+      setFactConsumed(false);
       const userId = auth().currentUser?.uid;
       if (!userId) throw new Error('User not authenticated');
 
@@ -74,9 +79,35 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
     }
   };
 
-  useEffect(() => {
-    loadFact();
-  }, []);
+  useFocusEffect(
+    React.useCallback(() => {
+      loadFact();
+    }, [route.params.selectedTopics]) // Reload when topics change
+  );
+
+  const handleSwipeUp = async () => {
+    try {
+      console.log('Loved fact:', fact?.content);
+      setFactConsumed(true);
+    } catch (error) {
+      console.error('Error handling swipe up:', error);
+      setError('Failed to process your response. Please try again.');
+    }
+  };
+
+  const handleSwipeLeft = async () => {
+    setFactConsumed(true);
+  };
+
+  const handleSwipeRight = async () => {
+    try {
+      console.log('Liked fact:', fact?.content);
+      setFactConsumed(true);
+    } catch (error) {
+      console.error('Error handling swipe right:', error);
+      setError('Failed to process your response. Please try again.');
+    }
+  };
 
   if (loading) {
     return (
@@ -102,18 +133,20 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
     );
   }
 
+  if (factConsumed) {
+    return <FactConsumedScreen />;
+  }
+
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        <Text style={styles.topicLabel}>TODAY'S FACT ABOUT</Text>
-        <Text style={styles.topic}>{fact?.topic?.toUpperCase()}</Text>
-        <View style={styles.factCard}>
-          <Text style={styles.factText}>{fact?.content}</Text>
-        </View>
-        <TouchableOpacity style={styles.refreshButton} onPress={loadFact}>
-          <Text style={styles.refreshButtonText}>Get Another Fact</Text>
-        </TouchableOpacity>
-      </View>
+      {fact && (
+        <SwipeableFact
+          fact={fact}
+          onSwipeLeft={handleSwipeLeft}
+          onSwipeRight={handleSwipeRight}
+          onSwipeUp={handleSwipeUp}
+        />
+      )}
     </SafeAreaView>
   );
 };
