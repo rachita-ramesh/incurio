@@ -21,7 +21,8 @@ target 'incurio' do
   use_react_native!(
     :path => config[:reactNativePath],
     # An absolute path to your application root.
-    :app_path => "#{Pod::Config.instance.installation_root}/.."
+    :app_path => "#{Pod::Config.instance.installation_root}/..",
+    :hermes_enabled => true
   )
 
   post_install do |installer|
@@ -36,8 +37,21 @@ target 'incurio' do
     react_native_post_install(
       installer,
       config[:reactNativePath],
-      :mac_catalyst_enabled => false,
-      # :ccache_enabled => true
+      :mac_catalyst_enabled => false
     )
+    
+    # Configure Hermes
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        if target.name == 'hermes-engine'
+          config.build_settings['ONLY_ACTIVE_ARCH'] = 'NO'
+          config.build_settings['DEPLOYMENT_POSTPROCESSING'] = 'YES'
+          config.build_settings['GENERATE_MASTER_OBJECT_FILE'] = 'YES'
+          config.build_settings['STRIP_INSTALLED_PRODUCT'] = 'YES'
+          config.build_settings['STRIP_STYLE'] = 'debugging'
+          config.build_settings['DEBUG_INFORMATION_FORMAT'] = 'dwarf-with-dsym'
+        end
+      end
+    end
   end
 end

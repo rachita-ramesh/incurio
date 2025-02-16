@@ -1563,6 +1563,8 @@ PODS:
   - RecaptchaInterop (100.0.0)
   - RNCAsyncStorage (2.1.1):
     - React-Core
+  - RNCPushNotificationIOS (1.11.0):
+    - React-Core
   - RNFBApp (21.7.4):
     - Firebase/CoreOnly (= 11.7.0)
     - React-Core
@@ -1689,6 +1691,7 @@ DEPENDENCIES:
   - ReactCodegen (from `build/generated/ios`)
   - ReactCommon/turbomodule/core (from `../node_modules/react-native/ReactCommon`)
   - "RNCAsyncStorage (from `../node_modules/@react-native-async-storage/async-storage`)"
+  - "RNCPushNotificationIOS (from `../node_modules/@react-native-community/push-notification-ios`)"
   - "RNFBApp (from `../node_modules/@react-native-firebase/app`)"
   - "RNFBAuth (from `../node_modules/@react-native-firebase/auth`)"
   - RNGestureHandler (from `../node_modules/react-native-gesture-handler`)
@@ -1849,6 +1852,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon"
   RNCAsyncStorage:
     :path: "../node_modules/@react-native-async-storage/async-storage"
+  RNCPushNotificationIOS:
+    :path: "../node_modules/@react-native-community/push-notification-ios"
   RNFBApp:
     :path: "../node_modules/@react-native-firebase/app"
   RNFBAuth:
@@ -1943,6 +1948,7 @@ SPEC CHECKSUMS:
   ReactCommon: a02340b2a1a76f3703298a4680bb03277ca87440
   RecaptchaInterop: 7d1a4a01a6b2cb1610a47ef3f85f0c411434cb21
   RNCAsyncStorage: 03861ec2e1e46b20e51963c62c51dc288beb7c43
+  RNCPushNotificationIOS: 64218f3c776c03d7408284a819b2abfda1834bc8
   RNFBApp: 67d339b258f6741ff2d9aa2d2bb9ba34ac7b7375
   RNFBAuth: 19cfa8270089b252a3010754938f9d2b75f041c3
   RNGestureHandler: 1dab7bdd13ffd0e4a9eeda08bc6209a236a3bf45
@@ -1951,6 +1957,6 @@ SPEC CHECKSUMS:
   SocketRocket: d4aabe649be1e368d1318fdf28a022d714d65748
   Yoga: c34725819ab0a5962e85455b9e56679b306910ee
 
-PODFILE CHECKSUM: 4897f60e81287113799b4ab72271ecabc9b5b651
+PODFILE CHECKSUM: 6589a774b5c726129b02c3239be126e18b4f5455
 
 COCOAPODS: 1.16.2
