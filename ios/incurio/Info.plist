@@ -25,18 +25,24 @@
 		<dict>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.googleusercontent.apps.300660316911-vhtc63tst95sucke51dsp5s7f2po9vi9</string>
+				<string>com.googleusercontent.apps.853554015668-pm7cucqhra01lphok4og1bo5ddfu1ff9</string>
 			</array>
 			<key>CFBundleURLName</key>
-			<string>com.incurio</string>
-			<key>CFBundleTypeRole</key>
-			<string>Editor</string>
+			<string>google</string>
+		</dict>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>incurio</string>
+			</array>
+			<key>CFBundleURLName</key>
+			<string>app</string>
 		</dict>
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>GIDClientID</key>
-	<string>300660316911-vhtc63tst95sucke51dsp5s7f2po9vi9.apps.googleusercontent.com</string>
+	<string>853554015668-pm7cucqhra01lphok4og1bo5ddfu1ff9.apps.googleusercontent.com</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSAppTransportSecurity</key>

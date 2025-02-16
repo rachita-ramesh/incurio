@@ -8,11 +8,12 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { factGeneratorService } from '../../services/factGenerator';
-import auth from '@react-native-firebase/auth';
+import { supabase } from '../../api/supabase';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { SwipeableFact } from '../../components/SwipeableFact';
 import { FactConsumedScreen } from '../../components/FactConsumedScreen';
 import { useFocusEffect } from '@react-navigation/native';
+import { notificationService } from '../../services/notificationService';
 
 type RootStackParamList = {
   Auth: undefined;
@@ -20,19 +21,28 @@ type RootStackParamList = {
   Fact: {
     selectedTopics: string[];
   };
+  Account: undefined;
 };
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Fact'>;
 
+interface Fact {
+  id: string;
+  content: string;
+  topic: string;
+  details: string;
+}
+
 export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
-  const [fact, setFact] = useState<{ content: string; topic: string } | null>(null);
+  const [fact, setFact] = useState<Fact | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [factConsumed, setFactConsumed] = useState(false);
 
   const handleSignOut = async () => {
     try {
-      await auth().signOut();
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
       navigation.replace('Auth');
     } catch (error) {
       console.error('Sign out error:', error);
@@ -42,10 +52,14 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
   useEffect(() => {
     navigation.setOptions({
       headerRight: () => (
-        <TouchableOpacity onPress={handleSignOut} style={styles.signOutButton}>
-          <Text style={styles.signOutText}>Sign Out</Text>
+        <TouchableOpacity onPress={() => navigation.navigate('Account')} style={styles.accountButton}>
+          <Text style={styles.accountButtonText}>👤</Text>
         </TouchableOpacity>
       ),
+      headerTitleStyle: {
+        fontFamily: 'AvenirNext-Medium',
+        fontSize: 20,
+      },
     });
   }, [navigation]);
 
@@ -53,23 +67,33 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
     try {
       setLoading(true);
       setError(null);
-      setFactConsumed(false);
-      const userId = auth().currentUser?.uid;
-      if (!userId) throw new Error('User not authenticated');
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // Check if user has already consumed today's fact
+      const hasConsumed = await factGeneratorService.checkIfFactAvailableToday(user.id);
+      if (hasConsumed) {
+        setFactConsumed(true);
+        return;
+      }
 
       const dailyFact = await factGeneratorService.getTodaysFact(
-        userId,
+        user.id,
         route.params.selectedTopics,
         'Prefer concise, interesting facts that are easy to understand.'
       );
       
-      if (!dailyFact.content) {
-        throw new Error('No fact content received');
+      if (!dailyFact.content || !dailyFact.id) {
+        throw new Error('Invalid fact received: missing content or ID');
       }
       
+      console.log('Setting fact with ID:', dailyFact.id);
       setFact({
+        id: dailyFact.id,
         content: dailyFact.content,
-        topic: dailyFact.topic
+        topic: dailyFact.topic,
+        details: dailyFact.details
       });
     } catch (err) {
       console.error('Error loading fact:', err);
@@ -81,13 +105,34 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
 
   useFocusEffect(
     React.useCallback(() => {
-      loadFact();
-    }, [route.params.selectedTopics]) // Reload when topics change
+      if (!factConsumed) {
+        loadFact();
+      }
+    }, [route.params.selectedTopics, factConsumed])
   );
 
   const handleSwipeUp = async () => {
     try {
-      console.log('Loved fact:', fact?.content);
+      if (!fact) return;
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // Save the love interaction
+      const { error: interactionError } = await supabase
+        .from('user_interactions')
+        .insert([{
+          user_id: user.id,
+          fact_id: fact.id,
+          interaction_type: 'love',
+        }]);
+
+      if (interactionError) throw interactionError;
+      console.log('Loved fact:', fact.content);
+      
+      // Schedule next notification
+      notificationService.scheduleDailyNotification();
+      
       setFactConsumed(true);
     } catch (error) {
       console.error('Error handling swipe up:', error);
@@ -96,12 +141,62 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
   };
 
   const handleSwipeLeft = async () => {
-    setFactConsumed(true);
+    try {
+      if (!fact) return;
+      if (!fact.id) {
+        console.error('Cannot save interaction: fact has no ID');
+        setError('Failed to process your response. Please try again.');
+        return;
+      }
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      console.log('Saving dislike interaction for fact:', fact.id);
+      // Save the dislike interaction
+      const { error: interactionError } = await supabase
+        .from('user_interactions')
+        .insert([{
+          user_id: user.id,
+          fact_id: fact.id,
+          interaction_type: 'dislike',
+        }]);
+
+      if (interactionError) throw interactionError;
+      console.log('Successfully saved dislike for fact:', fact.id);
+      
+      // Schedule next notification
+      notificationService.scheduleDailyNotification();
+      
+      setFactConsumed(true);
+    } catch (error) {
+      console.error('Error handling swipe left:', error);
+      setError('Failed to process your response. Please try again.');
+    }
   };
 
   const handleSwipeRight = async () => {
     try {
-      console.log('Liked fact:', fact?.content);
+      if (!fact) return;
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // Save the like interaction
+      const { error: interactionError } = await supabase
+        .from('user_interactions')
+        .insert([{
+          user_id: user.id,
+          fact_id: fact.id,
+          interaction_type: 'like',
+        }]);
+
+      if (interactionError) throw interactionError;
+      console.log('Liked fact:', fact.content);
+      
+      // Schedule next notification
+      notificationService.scheduleDailyNotification();
+      
       setFactConsumed(true);
     } catch (error) {
       console.error('Error handling swipe right:', error);
@@ -170,6 +265,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 16,
+    fontFamily: 'AvenirNext-Regular',
     color: '#666',
   },
   errorContainer: {
@@ -180,6 +276,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 16,
+    fontFamily: 'AvenirNext-Regular',
     color: '#f44336',
     textAlign: 'center',
     marginBottom: 16,
@@ -193,6 +290,7 @@ const styles = StyleSheet.create({
   retryButtonText: {
     color: '#fff',
     fontSize: 16,
+    fontFamily: 'AvenirNext-Medium',
     fontWeight: '600',
   },
   topicLabel: {
@@ -237,12 +335,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  signOutButton: {
-    padding: 12,
+  accountButton: {
+    paddingHorizontal: 12,
+    paddingTop: 4,
+    paddingBottom: 10,
   },
-  signOutText: {
+  accountButtonText: {
     color: '#4285F4',
-    fontSize: 16,
+    fontSize: 28,
+    fontFamily: 'AvenirNext-Medium',
     fontWeight: '600',
   },
 }); 

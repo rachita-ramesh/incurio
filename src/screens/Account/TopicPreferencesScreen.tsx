@@ -1,34 +1,40 @@
 import React, { useEffect, useState } from 'react';
-import { SafeAreaView, ActivityIndicator, View, Text, StyleSheet } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  SafeAreaView,
+  ActivityIndicator,
+  Alert,
+} from 'react-native';
 import { supabase, supabaseApi } from '../../api/supabase';
 import { TopicSelector } from '../../components/TopicSelector';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 type RootStackParamList = {
-  Home: undefined;
-  Fact: {
-    selectedTopics: string[];
-  };
+  Account: undefined;
+  TopicPreferences: undefined;
+  Fact: { selectedTopics: string[] };
 };
 
 type Props = {
-  navigation: NativeStackNavigationProp<RootStackParamList, 'Home'>;
+  navigation: NativeStackNavigationProp<RootStackParamList, 'TopicPreferences'>;
 };
 
-export const HomeScreen: React.FC<Props> = ({ navigation }) => {
+export const TopicPreferencesScreen: React.FC<Props> = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
+  const [currentPreferences, setCurrentPreferences] = useState<string[]>([]);
 
   useEffect(() => {
-    loadUserPreferences();
+    loadCurrentPreferences();
   }, []);
 
-  const loadUserPreferences = async () => {
+  const loadCurrentPreferences = async () => {
     try {
       setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Get user's existing preferences
       const { data: userData, error } = await supabase
         .from('users')
         .select('preferences')
@@ -37,12 +43,12 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
       if (error) throw error;
 
-      // If user has preferences, go directly to Fact screen
-      if (userData?.preferences && userData.preferences.length > 0) {
-        navigation.replace('Fact', { selectedTopics: userData.preferences });
+      if (userData?.preferences) {
+        setCurrentPreferences(userData.preferences);
       }
     } catch (error) {
       console.error('Error loading preferences:', error);
+      Alert.alert('Error', 'Failed to load your preferences. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -50,21 +56,27 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
   const handleTopicsSelected = async (selectedTopics: string[]) => {
     try {
+      setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       await supabaseApi.saveUserPreferences(user.id, selectedTopics);
-      navigation.replace('Fact', { selectedTopics });
+      Alert.alert('Success', 'Your preferences have been updated!');
+      navigation.navigate('Fact', { selectedTopics });
     } catch (error) {
-      console.error('Error saving topics:', error);
+      console.error('Error saving preferences:', error);
+      Alert.alert('Error', 'Failed to save your preferences. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#4285F4" />
+          <Text style={styles.loadingText}>Loading your preferences...</Text>
         </View>
       </SafeAreaView>
     );
@@ -78,7 +90,10 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
           Select the topics you're interested in learning about
         </Text>
       </View>
-      <TopicSelector onTopicsSelected={handleTopicsSelected} />
+      <TopicSelector
+        onTopicsSelected={handleTopicsSelected}
+        initialTopics={currentPreferences}
+      />
     </SafeAreaView>
   );
 };
@@ -100,6 +115,17 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   subtitle: {
+    fontSize: 16,
+    fontFamily: 'AvenirNext-Regular',
+    color: '#666',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
     fontSize: 16,
     fontFamily: 'AvenirNext-Regular',
     color: '#666',

@@ -7,16 +7,19 @@
 
 import React, { useEffect, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, Linking } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import auth from '@react-native-firebase/auth';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from './src/api/supabase';
 import { AuthScreen } from './src/screens/Auth/AuthScreen';
-import { initializeFirebase } from './src/config/firebase';
 import { HomeScreen } from './src/screens/Home/HomeScreen';
 import { FactScreen } from './src/screens/Fact/FactScreen';
+import { Session } from '@supabase/supabase-js';
+import { AccountScreen } from './src/screens/Account/AccountScreen';
+import { TopicPreferencesScreen } from './src/screens/Account/TopicPreferencesScreen';
+import { FactHistoryScreen } from './src/screens/Account/FactHistoryScreen';
+import { notificationService } from './src/services/notificationService';
 
 type RootStackParamList = {
   Auth: undefined;
@@ -24,70 +27,137 @@ type RootStackParamList = {
   Fact: {
     selectedTopics: string[];
   };
+  Account: undefined;
+  TopicPreferences: undefined;
+  FactHistory: { filter: 'like' | 'love' | 'dislike' };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
-const AUTH_PERSISTENCE_KEY = '@auth_tokens';
 
 function App(): React.JSX.Element {
   const [initializing, setInitializing] = useState(true);
-  const [user, setUser] = useState<any>(null);
-
-  const restoreAuthState = async () => {
-    try {
-      console.log('Attempting to restore auth state...');
-      const storedAuth = await AsyncStorage.getItem(AUTH_PERSISTENCE_KEY);
-      
-      if (storedAuth) {
-        console.log('Found stored auth data');
-        const { idToken, timestamp } = JSON.parse(storedAuth);
-        
-        // Check if token is not too old (1 hour expiry)
-        const now = Date.now();
-        const tokenAge = now - timestamp;
-        const ONE_HOUR = 60 * 60 * 1000;
-        
-        if (tokenAge > ONE_HOUR) {
-          console.log('Stored token is expired, removing...');
-          await AsyncStorage.removeItem(AUTH_PERSISTENCE_KEY);
-          return;
-        }
-
-        if (idToken) {
-          console.log('Attempting to sign in with stored token...');
-          const credential = auth.GoogleAuthProvider.credential(idToken);
-          await auth().signInWithCredential(credential);
-          console.log('Successfully restored auth state');
-        }
-      } else {
-        console.log('No stored auth data found');
-      }
-    } catch (error) {
-      console.error('Error restoring auth state:', error);
-      // Clear stored tokens if they're invalid
-      await AsyncStorage.removeItem(AUTH_PERSISTENCE_KEY);
-    }
-  };
+  const [session, setSession] = useState<Session | null>(null);
 
   useEffect(() => {
     const setup = async () => {
       try {
-        console.log('Initializing app...');
-        await initializeFirebase();
-        
+        console.log('=== Starting App Setup ===');
+
+        // Schedule daily notifications
+        await notificationService.requestPermissions();
+        notificationService.scheduleDailyNotification();
+
+        // Set up deep link handling
+        const handleDeepLink = async ({url}: {url: string}) => {
+          console.log('=== Handling Deep Link ===');
+          console.log('Received URL:', url);
+          
+          // Check for both formats of callback URL
+          if (url.includes('auth-callback') || url.includes('auth.callback')) {
+            console.log('Auth callback detected, refreshing session...');
+            
+            // Exchange the token
+            const { data: { session: newSession }, error } = await supabase.auth.getSession();
+            console.log('Session refresh result:', error ? 'Error' : 'Success');
+            
+            if (error) {
+              console.error('Error getting session after callback:', error);
+              return;
+            }
+            
+            if (newSession) {
+              console.log('New session received:', newSession.user?.id);
+              console.log('Setting session and updating state...');
+              setSession(newSession);
+            } else {
+              console.log('No session received after callback');
+              // Try refreshing the session
+              const { data: { session: refreshedSession }, error: refreshError } = 
+                await supabase.auth.refreshSession();
+              if (refreshedSession) {
+                console.log('Session refreshed successfully');
+                setSession(refreshedSession);
+              } else {
+                console.log('Could not refresh session:', refreshError);
+              }
+            }
+          } else {
+            console.log('URL does not contain auth callback');
+          }
+        };
+
+        // Set up deep link listeners
+        console.log('Setting up deep link listener...');
+        Linking.addEventListener('url', handleDeepLink);
+
+        // Check for initial URL
+        const initialUrl = await Linking.getInitialURL();
+        if (initialUrl) {
+          console.log('App opened with initial URL:', initialUrl);
+          await handleDeepLink({url: initialUrl});
+        } else {
+          console.log('No initial URL');
+        }
+
+        // Get initial session
+        console.log('Getting initial session...');
+        const { data: { session: initialSession }, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error('Error getting initial session:', error);
+          throw error;
+        }
+        console.log('Initial session:', initialSession?.user?.id || 'None');
+        setSession(initialSession);
+
         // Set up auth state listener
-        const subscriber = auth().onAuthStateChanged(currentUser => {
-          console.log('Auth state changed:', currentUser ? 'User signed in' : 'No user');
-          setUser(currentUser);
-          if (initializing) setInitializing(false);
+        console.log('Setting up auth state listener...');
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+          console.log('=== Auth State Changed ===');
+          console.log('Event:', event);
+          console.log('Session:', newSession?.user?.id || 'None');
+
+          if (event === 'SIGNED_IN') {
+            console.log('User signed in:', newSession?.user?.id);
+            // Check if this is a new user (first time sign up)
+            const { data: existingUser } = await supabase
+              .from('users')
+              .select('id')
+              .eq('id', newSession?.user?.id)
+              .single();
+
+            if (!existingUser && newSession?.user) {
+              console.log('New user detected, creating profile...');
+              const { error: profileError } = await supabase
+                .from('users')
+                .insert([
+                  {
+                    id: newSession.user.id,
+                    email: newSession.user.email,
+                    preferences: []
+                  }
+                ]);
+
+              if (profileError) {
+                console.error('Error creating user profile:', profileError);
+              } else {
+                console.log('User profile created successfully');
+              }
+            }
+          }
+
+          setSession(newSession);
         });
 
-        // Then try to restore auth state
-        await restoreAuthState();
+        setInitializing(false);
+        console.log('=== App Setup Complete ===');
         
-        return subscriber;
+        return () => {
+          console.log('Cleaning up auth subscription');
+          subscription.unsubscribe();
+        };
       } catch (error) {
-        console.error('Setup error:', error);
+        console.error('=== Setup Error ===');
+        console.error('Error details:', error);
         setInitializing(false);
       }
     };
@@ -107,7 +177,7 @@ function App(): React.JSX.Element {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <NavigationContainer>
         <Stack.Navigator>
-          {!user ? (
+          {!session ? (
             <Stack.Screen 
               name="Auth" 
               component={AuthScreen} 
@@ -126,6 +196,39 @@ function App(): React.JSX.Element {
                 options={{ 
                   headerShown: true,
                   title: 'Daily Fact',
+                  headerBackTitle: 'Back',
+                }}
+              />
+              <Stack.Screen
+                name="Account"
+                component={AccountScreen}
+                options={{
+                  headerShown: true,
+                  title: 'Account',
+                  headerBackTitle: 'Back',
+                  headerTitleStyle: {
+                    fontFamily: 'AvenirNext-Medium',
+                    fontSize: 20,
+                  },
+                  headerBackTitleStyle: {
+                    fontFamily: 'AvenirNext-Regular',
+                  },
+                }}
+              />
+              <Stack.Screen
+                name="TopicPreferences"
+                component={TopicPreferencesScreen}
+                options={{
+                  headerShown: true,
+                  title: 'Topic Preferences',
+                  headerBackTitle: 'Back',
+                }}
+              />
+              <Stack.Screen
+                name="FactHistory"
+                component={FactHistoryScreen}
+                options={{
+                  headerShown: true,
                   headerBackTitle: 'Back',
                 }}
               />

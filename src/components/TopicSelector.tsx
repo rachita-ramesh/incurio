@@ -5,10 +5,9 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Alert,
 } from 'react-native';
 
-const TOPICS = [
+const AVAILABLE_TOPICS = [
   'Science',
   'History',
   'Technology',
@@ -18,88 +17,75 @@ const TOPICS = [
   'Psychology',
   'Space',
   'Nature',
-  'Culture',
+  'Culture'
 ];
 
 interface TopicSelectorProps {
   onTopicsSelected: (topics: string[]) => void;
+  initialTopics?: string[];
 }
 
-export const TopicSelector: React.FC<TopicSelectorProps> = ({ onTopicsSelected }) => {
-  const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
+export const TopicSelector: React.FC<TopicSelectorProps> = ({
+  onTopicsSelected,
+  initialTopics = []
+}) => {
+  const [selectedTopics, setSelectedTopics] = useState<string[]>(initialTopics);
 
-  const handleTopicPress = (topic: string) => {
-    setSelectedTopics(prevTopics => {
-      if (prevTopics.includes(topic)) {
-        // Remove topic if already selected
-        return prevTopics.filter(t => t !== topic);
-      } else if (prevTopics.length < 2) {
-        // Add topic only if less than 2 are selected
-        return [...prevTopics, topic];
-      } else {
-        // If trying to add a third topic, show alert and return unchanged
-        Alert.alert(
-          'Maximum Topics Selected',
-          'You can only select 2 topics. Please deselect a topic before selecting a new one.'
-        );
-        return prevTopics;
-      }
-    });
+  const toggleTopic = (topic: string) => {
+    const newTopics = selectedTopics.includes(topic)
+      ? selectedTopics.filter(t => t !== topic)
+      : [...selectedTopics, topic];
+    setSelectedTopics(newTopics);
   };
 
   const handleContinue = () => {
-    if (selectedTopics.length !== 2) {
-      Alert.alert(
-        'Select Two Topics',
-        'Please select exactly 2 topics to continue.'
-      );
-      return;
+    if (selectedTopics.length > 0) {
+      onTopicsSelected(selectedTopics);
     }
-    onTopicsSelected(selectedTopics);
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Choose Your Interests</Text>
-      <Text style={styles.subtitle}>Select 2 topics you'd like to learn about</Text>
-      
-      <ScrollView 
-        contentContainerStyle={styles.topicsContainer}
-        showsVerticalScrollIndicator={false}
-      >
-        {TOPICS.map((topic) => (
-          <TouchableOpacity
-            key={topic}
-            style={[
-              styles.topicButton,
-              selectedTopics.includes(topic) && styles.selectedTopic,
-            ]}
-            onPress={() => handleTopicPress(topic)}
-          >
-            <Text 
+      <ScrollView style={styles.topicsContainer}>
+        <View style={styles.topicsGrid}>
+          {AVAILABLE_TOPICS.map(topic => (
+            <TouchableOpacity
+              key={topic}
               style={[
-                styles.topicText,
-                selectedTopics.includes(topic) && styles.selectedTopicText,
+                styles.topicButton,
+                selectedTopics.includes(topic) && styles.selectedTopic
               ]}
+              onPress={() => toggleTopic(topic)}
             >
-              {topic}
-            </Text>
-          </TouchableOpacity>
-        ))}
+              <Text
+                style={[
+                  styles.topicText,
+                  selectedTopics.includes(topic) && styles.selectedTopicText
+                ]}
+              >
+                {topic}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </ScrollView>
 
-      <TouchableOpacity
-        style={[
-          styles.continueButton,
-          selectedTopics.length !== 2 && styles.continueButtonDisabled,
-        ]}
-        onPress={handleContinue}
-        disabled={selectedTopics.length !== 2}
-      >
-        <Text style={styles.continueButtonText}>
-          Continue ({selectedTopics.length}/2 Selected)
-        </Text>
-      </TouchableOpacity>
+      <View style={styles.footer}>
+        <TouchableOpacity
+          style={[
+            styles.continueButton,
+            selectedTopics.length === 0 && styles.continueButtonDisabled
+          ]}
+          onPress={handleContinue}
+          disabled={selectedTopics.length === 0}
+        >
+          <Text style={styles.continueButtonText}>
+            {selectedTopics.length === 0
+              ? 'Select at least one topic'
+              : 'Continue'}
+          </Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
@@ -107,54 +93,49 @@ export const TopicSelector: React.FC<TopicSelectorProps> = ({ onTopicsSelected }
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
     backgroundColor: '#fff',
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 8,
-    color: '#000',
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 24,
-    textAlign: 'center',
-  },
   topicsContainer: {
+    flex: 1,
+    padding: 16,
+  },
+  topicsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 12,
-    paddingBottom: 20,
+    justifyContent: 'space-between',
   },
   topicButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 25,
-    backgroundColor: '#f0f0f0',
-    minWidth: '45%',
-    alignItems: 'center',
+    width: '48%',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    marginBottom: 16,
+    backgroundColor: '#fff',
   },
   selectedTopic: {
     backgroundColor: '#4285F4',
+    borderColor: '#4285F4',
   },
   topicText: {
     fontSize: 16,
-    color: '#333',
-    fontWeight: '500',
+    fontFamily: 'AvenirNext-Regular',
+    color: '#000',
+    textAlign: 'center',
   },
   selectedTopicText: {
     color: '#fff',
+  },
+  footer: {
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
   },
   continueButton: {
     backgroundColor: '#4285F4',
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
-    marginTop: 'auto',
   },
   continueButtonDisabled: {
     backgroundColor: '#ccc',
@@ -162,6 +143,7 @@ const styles = StyleSheet.create({
   continueButtonText: {
     color: '#fff',
     fontSize: 16,
+    fontFamily: 'AvenirNext-Medium',
     fontWeight: '600',
   },
 });

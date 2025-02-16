@@ -15,18 +15,21 @@ export interface Database {
           email: string
           preferences: string[]
           created_at: string
+          last_login: string
         }
         Insert: {
           id: string
           email: string
           preferences?: string[]
           created_at?: string
+          last_login?: string
         }
         Update: {
           id?: string
           email?: string
           preferences?: string[]
           created_at?: string
+          last_login?: string
         }
       }
       facts: {

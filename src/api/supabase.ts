@@ -14,6 +14,7 @@ export interface Fact {
   id: string;
   content: string;
   topic: string;
+  details: string;
   created_at: string;
 }
 
@@ -36,7 +37,12 @@ export const supabaseApi = {
   async saveFact(fact: Omit<Fact, 'id' | 'created_at'>) {
     return await supabase
       .from('facts')
-      .insert([fact]);
+      .insert([{
+        content: fact.content,
+        topic: fact.topic,
+        details: fact.details
+      }])
+      .select();
   },
 
   async saveInteraction(interaction: Omit<UserInteraction, 'id' | 'created_at'>) {
