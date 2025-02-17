@@ -7,13 +7,15 @@ import {
   TouchableOpacity,
   SafeAreaView,
 } from 'react-native';
-import { factGeneratorService } from '../../services/factGenerator';
+import { sparkGeneratorService } from '../../services/factGenerator';
+import { DAILY_SPARK_KEY } from '../../services/factGenerator';
 import { supabase } from '../../api/supabase';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { SwipeableFact } from '../../components/SwipeableFact';
-import { FactConsumedScreen } from '../../components/FactConsumedScreen';
+import { SwipeableSpark } from '../../components/SwipeableFact';
+import { SparkConsumedScreen } from '../../components/FactConsumedScreen';
 import { useFocusEffect } from '@react-navigation/native';
 import { notificationService } from '../../services/notificationService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type RootStackParamList = {
   Auth: undefined;
@@ -26,7 +28,7 @@ type RootStackParamList = {
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Fact'>;
 
-interface Fact {
+interface Spark {
   id: string;
   content: string;
   topic: string;
@@ -34,10 +36,10 @@ interface Fact {
 }
 
 export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
-  const [fact, setFact] = useState<Fact | null>(null);
+  const [spark, setSpark] = useState<Spark | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [factConsumed, setFactConsumed] = useState(false);
+  const [sparkConsumed, setSparkConsumed] = useState(false);
 
   const handleSignOut = async () => {
     try {
@@ -63,7 +65,7 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
     });
   }, [navigation]);
 
-  const loadFact = async () => {
+  const loadSpark = async () => {
     try {
       setLoading(true);
       setError(null);
@@ -71,33 +73,50 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      // Check if user has already consumed today's fact
-      const hasConsumed = await factGeneratorService.checkIfFactAvailableToday(user.id);
+      // Check if user has already consumed today's spark
+      const hasConsumed = await sparkGeneratorService.checkIfSparkAvailableToday(user.id);
       if (hasConsumed) {
-        setFactConsumed(true);
+        setSparkConsumed(true);
         return;
       }
 
-      const dailyFact = await factGeneratorService.getTodaysFact(
+      // Check if we have a spark for today but haven't interacted with it
+      const hasSpark = await sparkGeneratorService.hasSparkForToday(user.id);
+      if (hasSpark) {
+        const storedSpark = await AsyncStorage.getItem(`${DAILY_SPARK_KEY}_${user.id}`);
+        if (storedSpark) {
+          const parsedSpark = JSON.parse(storedSpark);
+          setSpark({
+            id: parsedSpark.id,
+            content: parsedSpark.content,
+            topic: parsedSpark.topic,
+            details: parsedSpark.details
+          });
+          setLoading(false);
+          return;
+        }
+      }
+
+      const dailySpark = await sparkGeneratorService.getTodaysSpark(
         user.id,
         route.params.selectedTopics,
-        'Prefer concise, interesting facts that are easy to understand.'
+        'Prefer concise, interesting sparks that are easy to understand and ignite curiosity.'
       );
       
-      if (!dailyFact.content || !dailyFact.id) {
-        throw new Error('Invalid fact received: missing content or ID');
+      if (!dailySpark.content || !dailySpark.id) {
+        throw new Error('Invalid spark received: missing content or ID');
       }
       
-      console.log('Setting fact with ID:', dailyFact.id);
-      setFact({
-        id: dailyFact.id,
-        content: dailyFact.content,
-        topic: dailyFact.topic,
-        details: dailyFact.details
+      console.log('Setting spark with ID:', dailySpark.id);
+      setSpark({
+        id: dailySpark.id,
+        content: dailySpark.content,
+        topic: dailySpark.topic,
+        details: dailySpark.details
       });
     } catch (err) {
-      console.error('Error loading fact:', err);
-      setError('Failed to load today\'s fact. Please try again later.');
+      console.error('Error loading spark:', err);
+      setError('Failed to load today\'s spark. Please try again later.');
     } finally {
       setLoading(false);
     }
@@ -105,15 +124,29 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
 
   useFocusEffect(
     React.useCallback(() => {
-      if (!factConsumed) {
-        loadFact();
+      if (!sparkConsumed) {
+        loadSpark();
       }
-    }, [route.params.selectedTopics, factConsumed])
+    }, [route.params.selectedTopics, sparkConsumed])
   );
+
+  const handleInteraction = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      await sparkGeneratorService.markSparkAsInteracted(user.id);
+      notificationService.scheduleDailyNotification();
+      setSparkConsumed(true);
+    } catch (error) {
+      console.error('Error handling interaction:', error);
+      setError('Failed to process your response. Please try again.');
+    }
+  };
 
   const handleSwipeUp = async () => {
     try {
-      if (!fact) return;
+      if (!spark) return;
       
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
@@ -123,17 +156,14 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
         .from('user_interactions')
         .insert([{
           user_id: user.id,
-          fact_id: fact.id,
+          spark_id: spark.id,
           interaction_type: 'love',
         }]);
 
       if (interactionError) throw interactionError;
-      console.log('Loved fact:', fact.content);
+      console.log('Loved spark:', spark.content);
       
-      // Schedule next notification
-      notificationService.scheduleDailyNotification();
-      
-      setFactConsumed(true);
+      await handleInteraction();
     } catch (error) {
       console.error('Error handling swipe up:', error);
       setError('Failed to process your response. Please try again.');
@@ -142,33 +172,24 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
 
   const handleSwipeLeft = async () => {
     try {
-      if (!fact) return;
-      if (!fact.id) {
-        console.error('Cannot save interaction: fact has no ID');
-        setError('Failed to process your response. Please try again.');
-        return;
-      }
+      if (!spark) return;
       
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      console.log('Saving dislike interaction for fact:', fact.id);
       // Save the dislike interaction
       const { error: interactionError } = await supabase
         .from('user_interactions')
         .insert([{
           user_id: user.id,
-          fact_id: fact.id,
+          spark_id: spark.id,
           interaction_type: 'dislike',
         }]);
 
       if (interactionError) throw interactionError;
-      console.log('Successfully saved dislike for fact:', fact.id);
+      console.log('Disliked spark:', spark.content);
       
-      // Schedule next notification
-      notificationService.scheduleDailyNotification();
-      
-      setFactConsumed(true);
+      await handleInteraction();
     } catch (error) {
       console.error('Error handling swipe left:', error);
       setError('Failed to process your response. Please try again.');
@@ -177,7 +198,7 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
 
   const handleSwipeRight = async () => {
     try {
-      if (!fact) return;
+      if (!spark) return;
       
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
@@ -187,17 +208,14 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
         .from('user_interactions')
         .insert([{
           user_id: user.id,
-          fact_id: fact.id,
+          spark_id: spark.id,
           interaction_type: 'like',
         }]);
 
       if (interactionError) throw interactionError;
-      console.log('Liked fact:', fact.content);
+      console.log('Liked spark:', spark.content);
       
-      // Schedule next notification
-      notificationService.scheduleDailyNotification();
-      
-      setFactConsumed(true);
+      await handleInteraction();
     } catch (error) {
       console.error('Error handling swipe right:', error);
       setError('Failed to process your response. Please try again.');
@@ -209,7 +227,7 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#4285F4" />
-          <Text style={styles.loadingText}>Generating your daily fact...</Text>
+          <Text style={styles.loadingText}>Generating your daily spark...</Text>
         </View>
       </SafeAreaView>
     );
@@ -220,7 +238,7 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
       <SafeAreaView style={styles.container}>
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={loadFact}>
+          <TouchableOpacity style={styles.retryButton} onPress={loadSpark}>
             <Text style={styles.retryButtonText}>Try Again</Text>
           </TouchableOpacity>
         </View>
@@ -228,15 +246,15 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
     );
   }
 
-  if (factConsumed) {
-    return <FactConsumedScreen />;
+  if (sparkConsumed) {
+    return <SparkConsumedScreen />;
   }
 
   return (
     <SafeAreaView style={styles.container}>
-      {fact && (
-        <SwipeableFact
-          fact={fact}
+      {spark && (
+        <SwipeableSpark
+          spark={spark}
           onSwipeLeft={handleSwipeLeft}
           onSwipeRight={handleSwipeRight}
           onSwipeUp={handleSwipeUp}

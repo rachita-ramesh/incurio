@@ -195,7 +195,7 @@ function App(): React.JSX.Element {
                 component={FactScreen}
                 options={{ 
                   headerShown: true,
-                  title: 'Daily Fact',
+                  title: 'Daily Spark',
                   headerBackTitle: 'Back',
                 }}
               />

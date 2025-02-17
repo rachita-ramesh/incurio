@@ -13,7 +13,7 @@ interface GeneratedContent {
   details: string;
 }
 
-export const generateFact = async (
+export const generateSpark = async (
   selectedTopics: string[],
   userPreferences: string
 ): Promise<GeneratedContent> => {
@@ -24,11 +24,11 @@ export const generateFact = async (
       messages: [
         {
           role: "system",
-          content: "You are a content generator that creates a mix of interesting facts, memorable quotes, and thought-provoking ideas. Your responses should be engaging and stimulate curiosity. You MUST respond with a JSON object in the following format:\n\n{\n  \"content\": \"A concise, attention-grabbing main statement (100-200 characters)\",\n  \"details\": \"A detailed explanation (minimum 200 words) with historical context and insights\",\n  \"topic\": \"MUST be one of the provided topics\"\n}\n\nThe detailed part must be substantially different from the main content, offering much more depth and perspective. The topic field is required and must exactly match one of the topics provided in the user's message."
+          content: "You are a curiosity igniter that creates intriguing sparks of knowledge. Alternate between different formats: thought-provoking questions, surprising insights, fascinating connections, or mind-bending perspectives. You MUST respond with a JSON object in the following format:\n\n{\n  \"content\": \"A spark of curiosity (100-200 characters) in various formats: questions ('What if...?'), insights ('The way wolves howl actually shapes forest ecosystems...'), or perspectives ('Ancient Romans saw colors differently than we do...'). No calls to action.\",\n  \"details\": \"A captivating exploration (minimum 200 words) that reveals unexpected connections and suggests fascinating directions for further discovery\",\n  \"topic\": \"MUST be one of the provided topics\"\n}\n\nThe content should be a complete thought that sparks curiosity on its own, without any explicit calls to action or meta-commentary. Vary between questions and declarative statements. The details section should provide rich context and exploration paths. The topic field must exactly match one of the topics provided in the user's message."
         },
         {
           role: "user",
-          content: `Generate either an interesting fact, a memorable quote, or a thought-provoking idea about one of these topics: ${selectedTopics.join(', ')}. The main content should be clear and captivating (100-200 characters), while the details section must provide extensive background, context, and insights (minimum 200 words). Consider these user preferences: ${userPreferences}.
+          content: `Generate a curiosity spark about one of these topics: ${selectedTopics.join(', ')}. The spark can be a thought-provoking question, a surprising insight, or an interesting perspective (100-200 characters), without any explicit calls to action. The details section should provide rich context and exploration paths. Consider these user preferences: ${userPreferences}.
 
 The topic field in the response MUST be exactly one of: ${selectedTopics.join(', ')} and MUST match the actual content.`
         }

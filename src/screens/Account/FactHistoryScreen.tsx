@@ -18,7 +18,7 @@ type RootStackParamList = {
 
 type Props = NativeStackScreenProps<RootStackParamList, 'FactHistory'>;
 
-interface FactWithInteraction {
+interface SparkWithInteraction {
   id: string;
   content: string;
   topic: string;
@@ -28,20 +28,20 @@ interface FactWithInteraction {
 
 export const FactHistoryScreen: React.FC<Props> = ({ route, navigation }) => {
   const [loading, setLoading] = useState(true);
-  const [facts, setFacts] = useState<FactWithInteraction[]>([]);
+  const [sparks, setSparks] = useState<SparkWithInteraction[]>([]);
 
   useEffect(() => {
-    loadFactHistory();
+    loadSparkHistory();
   }, [route.params.filter]);
 
-  const loadFactHistory = async () => {
+  const loadSparkHistory = async () => {
     try {
       setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       const { data, error } = await supabase
-        .from('facts')
+        .from('sparks')
         .select(`
           id,
           content,
@@ -59,7 +59,7 @@ export const FactHistoryScreen: React.FC<Props> = ({ route, navigation }) => {
       console.log('Filter:', route.params.filter);
       console.log('Data:', JSON.stringify(data, null, 2));
       
-      const mappedFacts = data.map(item => ({
+      const mappedSparks = data.map(item => ({
         id: item.id,
         content: item.content,
         topic: item.topic,
@@ -67,36 +67,24 @@ export const FactHistoryScreen: React.FC<Props> = ({ route, navigation }) => {
         interaction_type: item.user_interactions[0].interaction_type
       }));
 
-      console.log('=== Mapped Facts ===');
-      console.log('Mapped:', JSON.stringify(mappedFacts, null, 2));
+      console.log('=== Mapped Sparks ===');
+      console.log('Mapped:', JSON.stringify(mappedSparks, null, 2));
 
-      setFacts(mappedFacts);
+      setSparks(mappedSparks);
     } catch (error) {
-      console.error('Error loading fact history:', error);
+      console.error('Error loading spark history:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const getInteractionEmoji = (type: string) => {
-    switch (type) {
-      case 'like': return '👍';
-      case 'love': return '❤️';
-      case 'dislike': return '👎';
-      default: return '';
-    }
-  };
-
-  const renderFactCard = ({ item }: { item: FactWithInteraction }) => (
-    <View style={styles.factCard}>
-      <View style={styles.factHeader}>
-        <Text style={styles.factTopic}>{item.topic}</Text>
-        <Text style={styles.factEmoji}>
-          {getInteractionEmoji(item.interaction_type)}
-        </Text>
+  const renderSparkCard = ({ item }: { item: SparkWithInteraction }) => (
+    <View style={styles.sparkCard}>
+      <View style={styles.sparkHeader}>
+        <Text style={styles.sparkTopic}>{item.topic}</Text>
       </View>
-      <Text style={styles.factContent}>{item.content}</Text>
-      <Text style={styles.factDate}>
+      <Text style={styles.sparkContent}>{item.content}</Text>
+      <Text style={styles.sparkDate}>
         {new Date(item.created_at).toLocaleDateString()}
       </Text>
     </View>
@@ -107,7 +95,7 @@ export const FactHistoryScreen: React.FC<Props> = ({ route, navigation }) => {
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#4285F4" />
-          <Text style={styles.loadingText}>Loading your fact history...</Text>
+          <Text style={styles.loadingText}>Loading your spark history...</Text>
         </View>
       </SafeAreaView>
     );
@@ -117,23 +105,23 @@ export const FactHistoryScreen: React.FC<Props> = ({ route, navigation }) => {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>
-          {route.params.filter === 'like' ? 'Nice Facts' :
-           route.params.filter === 'love' ? 'Woah Facts' :
-           'Meh Facts'}
+          {route.params.filter === 'like' ? 'Nice Sparks' :
+           route.params.filter === 'love' ? 'Woah Sparks' :
+           'Meh Sparks'}
         </Text>
       </View>
-      {facts.length === 0 ? (
+      {sparks.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>
             No {route.params.filter === 'like' ? 'nice' :
                 route.params.filter === 'love' ? 'woah' :
-                'meh'} facts yet
+                'meh'} sparks yet
           </Text>
         </View>
       ) : (
         <FlatList
-          data={facts}
-          renderItem={renderFactCard}
+          data={sparks}
+          renderItem={renderSparkCard}
           keyExtractor={item => item.id}
           contentContainerStyle={styles.listContainer}
         />
@@ -171,7 +159,7 @@ const styles = StyleSheet.create({
   listContainer: {
     padding: 16,
   },
-  factCard: {
+  sparkCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
     padding: 16,
@@ -179,28 +167,25 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#eee',
   },
-  factHeader: {
+  sparkHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
   },
-  factTopic: {
+  sparkTopic: {
     fontSize: 14,
     color: '#4285F4',
     fontFamily: 'AvenirNext-Medium',
   },
-  factEmoji: {
-    fontSize: 20,
-  },
-  factContent: {
+  sparkContent: {
     fontSize: 16,
     color: '#000',
     lineHeight: 24,
     marginBottom: 8,
     fontFamily: 'AvenirNext-Regular',
   },
-  factDate: {
+  sparkDate: {
     fontSize: 12,
     color: '#666',
     fontFamily: 'AvenirNext-Regular',

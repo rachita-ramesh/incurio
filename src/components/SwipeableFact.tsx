@@ -17,8 +17,8 @@ const SCREEN_HEIGHT = Dimensions.get('window').height;
 const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.25;
 const SWIPE_UP_THRESHOLD = 100;
 
-interface SwipeableFactProps {
-  fact: {
+interface SwipeableSparkProps {
+  spark: {
     content: string;
     topic: string;
     details: string;
@@ -28,8 +28,8 @@ interface SwipeableFactProps {
   onSwipeUp: () => void;     // Love
 }
 
-export const SwipeableFact: React.FC<SwipeableFactProps> = ({
-  fact,
+export const SwipeableSpark: React.FC<SwipeableSparkProps> = ({
+  spark,
   onSwipeLeft,
   onSwipeRight,
   onSwipeUp,
@@ -112,17 +112,17 @@ export const SwipeableFact: React.FC<SwipeableFactProps> = ({
           ]}
         >
           <View style={styles.header}>
-            <Text style={styles.topicLabel}>TODAY'S FACT ABOUT</Text>
-            <Text style={styles.topic}>{fact.topic.toUpperCase()}</Text>
+            <Text style={styles.topicLabel}>SPARK OF</Text>
+            <Text style={styles.topic}>{spark.topic.toUpperCase()}</Text>
           </View>
           
           <View style={styles.contentContainer}>
-            <Text style={styles.content}>{fact.content}</Text>
+            <Text style={styles.content}>{spark.content}</Text>
             <TouchableOpacity 
               style={styles.readMoreButton}
               onPress={() => setModalVisible(true)}
             >
-              <Text style={styles.readMoreText}>Read More</Text>
+              <Text style={styles.readMoreText}>Dive Deeper 🔥</Text>
             </TouchableOpacity>
           </View>
           
@@ -133,7 +133,7 @@ export const SwipeableFact: React.FC<SwipeableFactProps> = ({
             </View>
             <View style={styles.instructionRow}>
               <Text style={styles.instructionIcon}>↑</Text>
-              <Text style={styles.instructionText}>woah 🤯</Text>
+              <Text style={styles.instructionText}>woah! 🤯</Text>
             </View>
             <View style={styles.instructionRow}>
               <Text style={styles.instructionIcon}>→</Text>
@@ -152,7 +152,7 @@ export const SwipeableFact: React.FC<SwipeableFactProps> = ({
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTopic}>MORE ABOUT THIS {fact.topic.toUpperCase()}</Text>
+              <Text style={styles.modalTopic}>EXPLORE THIS {spark.topic.toUpperCase()} SPARK</Text>
               <TouchableOpacity 
                 style={styles.closeButton}
                 onPress={() => setModalVisible(false)}
@@ -161,7 +161,7 @@ export const SwipeableFact: React.FC<SwipeableFactProps> = ({
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.modalScrollView}>
-              <Text style={styles.modalDetails}>{fact.details}</Text>
+              <Text style={styles.modalDetails}>{spark.details}</Text>
             </ScrollView>
           </View>
         </SafeAreaView>
@@ -193,12 +193,15 @@ const styles = StyleSheet.create({
   header: {
     padding: 24,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: '#E6E1FF',
+    backgroundColor: '#F8F5FF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
   },
   topicLabel: {
     fontSize: 16,
     fontFamily: 'AvenirNext-Regular',
-    color: '#666',
+    color: '#6B4EFF',
     marginBottom: 4,
     letterSpacing: 1,
   },
@@ -206,32 +209,41 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontFamily: 'AvenirNext-Bold',
     fontWeight: 'bold',
-    color: '#5B3FD1',
+    color: '#4A2EFF',
   },
   contentContainer: {
     flex: 1,
     padding: 24,
     justifyContent: 'center',
+    backgroundColor: '#FAFAFA',
   },
   content: {
     fontSize: 28,
     fontFamily: 'AvenirNext-Medium',
     lineHeight: 40,
-    color: '#333',
+    color: '#2F3542',
     textAlign: 'center',
     marginBottom: 24,
   },
   readMoreButton: {
     alignSelf: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    backgroundColor: '#5B3FD1',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    backgroundColor: '#6B4EFF',
     borderRadius: 20,
+    shadowColor: '#6B4EFF',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 6,
   },
   readMoreText: {
     color: '#fff',
-    fontSize: 16,
-    fontFamily: 'AvenirNext-Medium',
+    fontSize: 18,
+    fontFamily: 'AvenirNext-Bold',
   },
   instructionsContainer: {
     flexDirection: 'row',
@@ -240,20 +252,23 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     paddingHorizontal: 24,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: '#E6E1FF',
+    backgroundColor: '#F8F5FF',
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
   },
   instructionRow: {
     alignItems: 'center',
   },
   instructionIcon: {
     fontSize: 28,
-    color: '#5B3FD1',
+    color: '#6B4EFF',
     marginBottom: 8,
   },
   instructionText: {
     fontSize: 16,
     fontFamily: 'AvenirNext-Regular',
-    color: '#666',
+    color: '#2F3542',
     fontWeight: '500',
   },
   modalContainer: {
@@ -262,7 +277,7 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#FAFAFA',
     marginTop: 60,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
@@ -273,12 +288,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: '#E6E1FF',
+    backgroundColor: '#F8F5FF',
   },
   modalTopic: {
     fontSize: 20,
     fontFamily: 'AvenirNext-Bold',
-    color: '#5B3FD1',
+    color: '#4A2EFF',
     flex: 1,
     marginRight: 16,
   },
@@ -287,18 +303,20 @@ const styles = StyleSheet.create({
   },
   closeButtonText: {
     fontSize: 32,
-    color: '#666',
+    color: '#6B4EFF',
     lineHeight: 32,
   },
   modalScrollView: {
     flex: 1,
     padding: 20,
+    paddingBottom: 60,
   },
   modalDetails: {
     fontSize: 18,
     fontFamily: 'AvenirNext-Regular',
-    color: '#333',
+    color: '#2F3542',
     lineHeight: 28,
     textAlign: 'left',
+    paddingBottom: 80,
   },
 });

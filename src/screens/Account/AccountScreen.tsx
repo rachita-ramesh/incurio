@@ -44,19 +44,19 @@ export const AccountScreen: React.FC<Props> = ({ navigation }) => {
       icon: '🎯'
     },
     {
-      title: 'Nice Facts',
+      title: 'Nice Sparks',
       subtitle: 'Facts you thought were nice',
       onPress: () => navigation.navigate('FactHistory', { filter: 'like' }),
       icon: '😎'
     },
     {
-      title: 'Woah Facts',
+      title: 'Woah Sparks',
       subtitle: 'Facts that blew your mind',
       onPress: () => navigation.navigate('FactHistory', { filter: 'love' }),
       icon: '🤯'
     },
     {
-      title: 'Meh Facts',
+      title: 'Meh Sparks',
       subtitle: 'Facts you weren\'t into',
       onPress: () => navigation.navigate('FactHistory', { filter: 'dislike' }),
       icon: '😒'

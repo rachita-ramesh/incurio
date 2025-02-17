@@ -7,15 +7,14 @@ import {
 } from 'react-native';
 
 const MESSAGES = [
-  "Brain Boost Complete! 🧠✨",
-  "Knowledge Level Up! 🎮⬆️",
-  "Curiosity Satisfied! 🌟",
-  "Wisdom Acquired! 🎓✨",
-  "Mind = Blown! 🤯",
-  "Achievement Unlocked! 🏆",
+  "Curiosity Sparked! ⚡",
+  "Mind Blown! 🤯",
+  "New Paths Found! 🌟",
+  "Discovery Made! 🔮",
+  "Spark Ignited! ✨",
 ];
 
-export const FactConsumedScreen: React.FC = () => {
+export const SparkConsumedScreen: React.FC = () => {
   // Randomly select a message
   const randomMessage = MESSAGES[Math.floor(Math.random() * MESSAGES.length)];
 
@@ -24,7 +23,7 @@ export const FactConsumedScreen: React.FC = () => {
       <View style={styles.content}>
         <Text style={styles.title}>{randomMessage}</Text>
         <Text style={styles.message}>
-          See you tomorrow! Check your account for past facts.
+          Come back tomorrow for another spark! Check your account to revisit past discoveries.
         </Text>
       </View>
     </SafeAreaView>
@@ -34,7 +33,7 @@ export const FactConsumedScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#F8F5FF',
   },
   content: {
     flex: 1,
@@ -45,14 +44,17 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontFamily: 'AvenirNext-Bold',
-    color: '#5B3FD1',
+    color: '#800080',
     marginBottom: 16,
     textAlign: 'center',
+    textShadowColor: 'rgba(74, 46, 255, 0.2)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
   message: {
     fontSize: 18,
     fontFamily: 'AvenirNext-Regular',
-    color: '#666',
+    color: '#2F3542',
     textAlign: 'center',
     lineHeight: 24,
     paddingHorizontal: 20,

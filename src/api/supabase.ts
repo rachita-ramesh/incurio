@@ -10,7 +10,7 @@ export interface User {
   created_at: string;
 }
 
-export interface Fact {
+export interface Spark {
   id: string;
   content: string;
   topic: string;
@@ -21,7 +21,7 @@ export interface Fact {
 export interface UserInteraction {
   id: string;
   user_id: string;
-  fact_id: string;
+  spark_id: string;
   interaction_type: 'dislike' | 'like' | 'love';
   created_at: string;
 }
@@ -34,13 +34,13 @@ export const supabaseApi = {
       .eq('id', userId);
   },
 
-  async saveFact(fact: Omit<Fact, 'id' | 'created_at'>) {
+  async saveSpark(spark: Omit<Spark, 'id' | 'created_at'>) {
     return await supabase
-      .from('facts')
+      .from('sparks')
       .insert([{
-        content: fact.content,
-        topic: fact.topic,
-        details: fact.details
+        content: spark.content,
+        topic: spark.topic,
+        details: spark.details
       }])
       .select();
   },
@@ -53,7 +53,7 @@ export const supabaseApi = {
 
   async getUserHistory(userId: string) {
     return await supabase
-      .from('facts')
+      .from('sparks')
       .select(`
         *,
         user_interactions!inner(interaction_type)
