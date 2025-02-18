@@ -44,7 +44,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontFamily: 'AvenirNext-Bold',
-    color: '#800080',
+    color: '#4A2EFF',
     marginBottom: 16,
     textAlign: 'center',
     textShadowColor: 'rgba(74, 46, 255, 0.2)',

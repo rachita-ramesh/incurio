@@ -103,6 +103,10 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
         'Prefer concise, interesting sparks that are easy to understand and ignite curiosity.'
       );
       
+      if (!dailySpark) {
+        throw new Error('No spark available yet. Please wait until 8 AM.');
+      }
+      
       if (!dailySpark.content || !dailySpark.id) {
         throw new Error('Invalid spark received: missing content or ID');
       }

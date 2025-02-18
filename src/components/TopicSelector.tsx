@@ -114,13 +114,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   selectedTopic: {
-    backgroundColor: '#4285F4',
-    borderColor: '#4285F4',
+    backgroundColor: '#6B4EFF',
+    borderColor: '#6B4EFF',
   },
   topicText: {
     fontSize: 16,
     fontFamily: 'AvenirNext-Regular',
-    color: '#000',
+    color: '#2F3542',
     textAlign: 'center',
   },
   selectedTopicText: {
@@ -132,13 +132,22 @@ const styles = StyleSheet.create({
     borderTopColor: '#eee',
   },
   continueButton: {
-    backgroundColor: '#4285F4',
+    backgroundColor: '#6B4EFF',
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
+    shadowColor: '#6B4EFF',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 6,
   },
   continueButtonDisabled: {
     backgroundColor: '#ccc',
+    shadowOpacity: 0,
   },
   continueButtonText: {
     color: '#fff',

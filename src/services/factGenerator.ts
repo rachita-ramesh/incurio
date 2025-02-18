@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { generateSpark } from '../api/openai';
 import { supabaseApi } from '../api/supabase';
+import { notificationService } from './notificationService';
 
 export const DAILY_SPARK_KEY = 'daily_spark';
 export const SPARK_INTERACTION_KEY = 'spark_interaction';
@@ -17,39 +18,17 @@ interface DailySpark {
   details: string;
   date: string;
   userId: string;
+  generatedAt: string;
 }
 
 export const sparkGeneratorService = {
-  async getTodaysSpark(userId: string, selectedTopics: string[], userPreferences: string) {
+  async generateDailySpark(userId: string, selectedTopics: string[], userPreferences: string) {
     const today = new Date().toISOString().split('T')[0];
     const userSparkKey = `${DAILY_SPARK_KEY}_${userId}`;
     
-    // Check if we already have today's spark for this user
-    const storedSpark = await AsyncStorage.getItem(userSparkKey);
-    if (storedSpark) {
-      const parsedSpark: DailySpark = JSON.parse(storedSpark);
-      if (parsedSpark.date === today && parsedSpark.id) {
-        console.log('Returning cached spark for today with ID:', parsedSpark.id);
-        return parsedSpark;
-      }
-      // If spark is from a previous day or has no ID, remove it
-      console.log('Removing old or invalid spark from cache');
-      await AsyncStorage.removeItem(userSparkKey);
-    }
-
-    // Decide whether to show a spark from user's preferences or other topics
-    let topicsToUse = selectedTopics;
-    if (Math.random() < VARIETY_PROBABILITY) {
-      const otherTopics = ALL_TOPICS.filter(topic => !selectedTopics.includes(topic));
-      if (otherTopics.length > 0) {
-        console.log('Generating spark from non-preferred topics for variety');
-        topicsToUse = otherTopics;
-      }
-    }
-
     // Generate new spark
-    console.log('Generating new spark for topics:', topicsToUse);
-    const generatedSpark = await generateSpark(topicsToUse, userPreferences);
+    console.log('Generating new spark for topics:', selectedTopics);
+    const generatedSpark = await generateSpark(selectedTopics, userPreferences);
     
     // Save to Supabase first to get the ID
     const { data: savedSpark, error } = await supabaseApi.saveSpark({
@@ -71,7 +50,8 @@ export const sparkGeneratorService = {
       topic: generatedSpark.topic,
       details: generatedSpark.details,
       date: today,
-      userId: userId
+      userId: userId,
+      generatedAt: new Date().toISOString()
     };
 
     // Save to local storage with user-specific key
@@ -79,6 +59,36 @@ export const sparkGeneratorService = {
     console.log('Saved spark to local storage with ID:', spark.id);
 
     return spark;
+  },
+
+  async getTodaysSpark(userId: string, selectedTopics: string[], userPreferences: string) {
+    const today = new Date().toISOString().split('T')[0];
+    const userSparkKey = `${DAILY_SPARK_KEY}_${userId}`;
+    
+    // Check if we already have today's spark for this user
+    const storedSpark = await AsyncStorage.getItem(userSparkKey);
+    if (storedSpark) {
+      const parsedSpark: DailySpark = JSON.parse(storedSpark);
+      if (parsedSpark.date === today && parsedSpark.id) {
+        console.log('Returning cached spark for today with ID:', parsedSpark.id);
+        return parsedSpark;
+      }
+      // If spark is from a previous day or has no ID, remove it
+      console.log('Removing old or invalid spark from cache');
+      await AsyncStorage.removeItem(userSparkKey);
+    }
+
+    // Generate new spark if it's past 8 AM
+    const now = new Date();
+    const eightAM = new Date(now);
+    eightAM.setHours(8, 0, 0, 0);
+
+    if (now >= eightAM) {
+      return this.generateDailySpark(userId, selectedTopics, userPreferences);
+    } else {
+      console.log('Too early for today\'s spark. Please wait until 8 AM.');
+      return null;
+    }
   },
 
   async checkIfSparkAvailableToday(userId: string): Promise<boolean> {
@@ -99,6 +109,9 @@ export const sparkGeneratorService = {
     const today = new Date().toISOString().split('T')[0];
     const userInteractionKey = `${SPARK_INTERACTION_KEY}_${userId}_${today}`;
     await AsyncStorage.setItem(userInteractionKey, 'true');
+    
+    // Cancel the 9 AM notification since user has interacted
+    notificationService.cancelTodayNotification();
   },
 
   async clearStoredSpark(userId: string) {
@@ -118,5 +131,13 @@ export const sparkGeneratorService = {
     
     const parsedSpark: DailySpark = JSON.parse(storedSpark);
     return parsedSpark.date === today;
+  },
+
+  async shouldGenerateNewSpark(): Promise<boolean> {
+    const now = new Date();
+    const eightAM = new Date(now);
+    eightAM.setHours(8, 0, 0, 0);
+    
+    return now >= eightAM;
   }
 };

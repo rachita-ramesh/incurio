@@ -38,7 +38,7 @@ class NotificationService {
         channelDescription: 'Daily notification for new facts',
         playSound: true,
         soundName: 'default',
-        importance: Importance.HIGH,
+        importance: 'high',
         vibrate: true,
       },
       (created: boolean) => console.log(`Channel 'daily-facts' created: ${created}`)
@@ -49,15 +49,15 @@ class NotificationService {
     // Cancel any existing notifications
     PushNotification.cancelAllLocalNotifications();
 
-    // Schedule new notification for 9 AM every day
+    // Schedule reminder notification for 9 AM if user hasn't interacted
     PushNotification.localNotificationSchedule({
       channelId: 'daily-facts',
-      title: "🧠 Your Daily Dose of Knowledge",
-      message: "Today's fascinating fact is ready for you!",
+      title: "🧠 Don't Miss Today's Spark!",
+      message: "Your daily spark is waiting to ignite your curiosity!",
       date: this.getNextNotificationDate(),
       repeatType: 'day',
       allowWhileIdle: true,
-      importance: Importance.HIGH,
+      importance: 'high',
       playSound: true,
       soundName: 'default',
     });
@@ -76,6 +76,10 @@ class NotificationService {
     }
     
     return nextNotification;
+  };
+
+  cancelTodayNotification = () => {
+    PushNotification.cancelAllLocalNotifications();
   };
 
   requestPermissions = async (): Promise<PushNotificationPermissions | null> => {

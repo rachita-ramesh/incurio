@@ -22,6 +22,7 @@
 		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = incurio/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		20273289BB0A91C83E34CAB4 /* Pods_incurio.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_incurio.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		23ECF74BD4861C6F27BB0D7D /* Pods-incurio.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-incurio.release.xcconfig"; path = "Target Support Files/Pods-incurio/Pods-incurio.release.xcconfig"; sourceTree = "<group>"; };
+		3C3A928B2D62D148004D5076 /* incurio.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = incurio.entitlements; path = incurio/incurio.entitlements; sourceTree = "<group>"; };
 		3C4E51182D599D53004ACCC0 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		62102E3279E1C3796B568EAA /* Pods-incurio.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-incurio.debug.xcconfig"; path = "Target Support Files/Pods-incurio/Pods-incurio.debug.xcconfig"; sourceTree = "<group>"; };
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = incurio/AppDelegate.swift; sourceTree = "<group>"; };
@@ -44,6 +45,7 @@
 		13B07FAE1A68108700A75B9A /* incurio */ = {
 			isa = PBXGroup;
 			children = (
+				3C3A928B2D62D148004D5076 /* incurio.entitlements */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				761780EC2CA45674006654EE /* AppDelegate.swift */,
 				3C4E51182D599D53004ACCC0 /* GoogleService-Info.plist */,
@@ -277,6 +279,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = incurio/incurio.entitlements;
 				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = 3JZ37ZZ5NR;
 				ENABLE_BITCODE = NO;
@@ -306,6 +309,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = incurio/incurio.entitlements;
 				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = 3JZ37ZZ5NR;
 				INFOPLIST_FILE = incurio/Info.plist;

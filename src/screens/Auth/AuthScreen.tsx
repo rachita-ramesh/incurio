@@ -405,16 +405,25 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   button: {
-    backgroundColor: '#4285F4',
+    backgroundColor: '#6B4EFF',
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 8,
     width: '100%',
     alignItems: 'center',
     marginBottom: 24,
+    shadowColor: '#6B4EFF',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 6,
   },
   buttonDisabled: {
     backgroundColor: '#ccc',
+    shadowOpacity: 0,
   },
   buttonText: {
     color: '#fff',
@@ -433,7 +442,7 @@ const styles = StyleSheet.create({
     fontFamily: 'AvenirNext-Regular',
   },
   footerAction: {
-    color: '#4285F4',
+    color: '#6B4EFF',
     fontSize: 14,
     fontFamily: 'AvenirNext-Medium',
     fontWeight: '600',
