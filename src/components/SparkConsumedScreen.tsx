@@ -23,7 +23,8 @@ export const SparkConsumedScreen: React.FC = () => {
       <View style={styles.content}>
         <Text style={styles.title}>{randomMessage}</Text>
         <Text style={styles.message}>
-          Come back tomorrow for another spark! Check Curiosity Hub to revisit past discoveries.
+          Come back tomorrow for another spark! {'\n'}
+          Tap 🧠 to explore your collection of sparks.
         </Text>
       </View>
     </SafeAreaView>

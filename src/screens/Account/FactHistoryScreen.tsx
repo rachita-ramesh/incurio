@@ -105,9 +105,9 @@ export const FactHistoryScreen: React.FC<Props> = ({ route, navigation }) => {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>
-          {route.params.filter === 'like' ? 'Nice Sparks' :
-           route.params.filter === 'love' ? 'Woah Sparks' :
-           'Meh Sparks'}
+          {route.params.filter === 'like' ? 'Nice Sparks 😎' :
+           route.params.filter === 'love' ? 'Woah Sparks 🤯' :
+           'Meh Sparks 😒'}
         </Text>
       </View>
       {sparks.length === 0 ? (
@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontFamily: 'AvenirNext-Bold',
-    color: '#000',
+    color: '#6B4EFF',
   },
   loadingContainer: {
     flex: 1,
@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
   },
   sparkTopic: {
     fontSize: 14,
-    color: '#4285F4',
+    color: '#6B4EFF',
     fontFamily: 'AvenirNext-Medium',
   },
   sparkContent: {

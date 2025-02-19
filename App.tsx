@@ -13,16 +13,16 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { supabase } from './src/api/supabase';
 import { AuthScreen } from './src/screens/Auth/AuthScreen';
-import { HomeScreen } from './src/screens/Home/HomeScreen';
+import { TopicScreen } from './src/screens/Topic/TopicScreen';
 import { FactScreen } from './src/screens/Fact/FactScreen';
-import { Session } from '@supabase/supabase-js';
 import { AccountScreen } from './src/screens/Account/AccountScreen';
+import { SparkSearchScreen } from './src/screens/Search/SparkSearchScreen';
+import { notificationService } from './src/services/notificationService';
+import { Session } from '@supabase/supabase-js';
 import { TopicPreferencesScreen } from './src/screens/Account/TopicPreferencesScreen';
 import { FactHistoryScreen } from './src/screens/Account/FactHistoryScreen';
-import { notificationService } from './src/services/notificationService';
-import { TopicScreen } from './src/screens/Topic/TopicScreen';
 
-type RootStackParamList = {
+export type RootStackParamList = {
   Auth: undefined;
   Topic: undefined;
   Fact: {
@@ -31,6 +31,7 @@ type RootStackParamList = {
   CuriosityHub: undefined;
   TopicPreferences: undefined;
   FactHistory: { filter: 'like' | 'love' | 'dislike' };
+  SparkSearch: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -198,6 +199,11 @@ function App(): React.JSX.Element {
                   headerShown: true,
                   title: 'Daily Spark',
                   headerBackTitle: 'Back',
+                  headerTintColor: '#6B4EFF',
+                  headerTitleStyle: {
+                    fontFamily: 'AvenirNext-Medium',
+                    color: '#6B4EFF'
+                  },
                 }}
               />
               <Stack.Screen
@@ -207,9 +213,11 @@ function App(): React.JSX.Element {
                   headerShown: true,
                   title: 'Curiosity Hub',
                   headerBackTitle: 'Back',
+                  headerTintColor: '#6B4EFF',
                   headerTitleStyle: {
                     fontFamily: 'AvenirNext-Medium',
                     fontSize: 20,
+                    color: '#6B4EFF'
                   },
                   headerBackTitleStyle: {
                     fontFamily: 'AvenirNext-Regular',
@@ -221,8 +229,12 @@ function App(): React.JSX.Element {
                 component={TopicPreferencesScreen}
                 options={{
                   headerShown: true,
-                  title: 'Topic Preferences',
                   headerBackTitle: 'Back',
+                  title: '',
+                  headerTintColor: '#6B4EFF',
+                  headerTitleStyle: {
+                    fontFamily: 'AvenirNext-Medium',
+                  },
                 }}
               />
               <Stack.Screen
@@ -231,6 +243,27 @@ function App(): React.JSX.Element {
                 options={{
                   headerShown: true,
                   headerBackTitle: 'Back',
+                  title: '',
+                  headerTintColor: '#6B4EFF',
+                  headerTitleStyle: {
+                    fontFamily: 'AvenirNext-Medium',
+                  },
+                }}
+              />
+              <Stack.Screen
+                name="SparkSearch"
+                component={SparkSearchScreen}
+                options={{
+                  headerShown: true,
+                  headerBackTitle: 'Back',
+                  title: '',
+                  headerTintColor: '#6B4EFF',
+                  headerTitleStyle: {
+                    fontFamily: 'AvenirNext-Medium',
+                  },
+                  headerBackTitleStyle: {
+                    fontFamily: 'AvenirNext-Regular',
+                  },
                 }}
               />
             </>

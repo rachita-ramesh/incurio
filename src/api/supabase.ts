@@ -60,5 +60,24 @@ export const supabaseApi = {
       `)
       .eq('user_interactions.user_id', userId)
       .order('created_at', { ascending: false });
-  }
+  },
+
+  async searchSparks(userId: string, searchQuery: string) {
+    return await supabase
+      .from('sparks')
+      .select(`
+        id,
+        content,
+        topic,
+        details,
+        created_at,
+        user_interactions!inner (interaction_type)
+      `)
+      .eq('user_interactions.user_id', userId)
+      .textSearch('content', searchQuery, {
+        type: 'websearch',
+        config: 'english'
+      })
+      .order('created_at', { ascending: false });
+  },
 };

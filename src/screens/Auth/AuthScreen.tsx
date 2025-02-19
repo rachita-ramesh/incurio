@@ -278,6 +278,7 @@ export const AuthScreen: React.FC<Props> = ({ navigation }) => {
               onChangeText={setEmail}
               autoCapitalize="none"
               keyboardType="email-address"
+              placeholderTextColor="#999"
             />
 
             <TextInput
@@ -286,6 +287,7 @@ export const AuthScreen: React.FC<Props> = ({ navigation }) => {
               value={password}
               onChangeText={setPassword}
               secureTextEntry
+              placeholderTextColor="#999"
             />
 
             <TouchableOpacity 
@@ -403,6 +405,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#000',
     backgroundColor: '#fff',
+    fontFamily: 'AvenirNext-Regular',
   },
   button: {
     backgroundColor: '#6B4EFF',

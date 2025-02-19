@@ -1,11 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   SafeAreaView,
-  ScrollView,
   Alert,
 } from 'react-native';
 import { supabase } from '../../api/supabase';
@@ -17,11 +16,12 @@ type RootStackParamList = {
   Fact: { selectedTopics: string[] };
   TopicPreferences: undefined;
   FactHistory: { filter: 'like' | 'love' | 'dislike' };
-  Account: undefined;
+  CuriosityHub: undefined;
+  SparkSearch: undefined;
 };
 
 type Props = {
-  navigation: NativeStackNavigationProp<RootStackParamList, 'Account'>;
+  navigation: NativeStackNavigationProp<RootStackParamList, 'CuriosityHub'>;
 };
 
 export const AccountScreen: React.FC<Props> = ({ navigation }) => {
@@ -37,6 +37,12 @@ export const AccountScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const menuItems = [
+    {
+      title: 'Search Sparks',
+      subtitle: 'Find your past discoveries',
+      onPress: () => navigation.navigate('SparkSearch'),
+      icon: '🔍'
+    },
     {
       title: 'Topic Preferences',
       subtitle: 'Your curiosity compass',
@@ -60,27 +66,17 @@ export const AccountScreen: React.FC<Props> = ({ navigation }) => {
       subtitle: 'Less exciting ones',
       onPress: () => navigation.navigate('FactHistory', { filter: 'dislike' }),
       icon: '😒'
-    },
-    {
-      title: 'Sign Out',
-      subtitle: 'Thanks for exploring with us',
-      onPress: handleSignOut,
-      icon: '👋'
     }
   ];
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView>
-        <View style={styles.menuContainer}>
+      <View style={styles.content}>
+        <View style={styles.menuSection}>
           {menuItems.map((item, index) => (
             <TouchableOpacity
               key={item.title}
-              style={[
-                styles.menuItem,
-                index === menuItems.length - 1 && styles.lastMenuItem,
-                index === menuItems.length - 1 && styles.signOutMenuItem
-              ]}
+              style={[styles.menuItem]}
               onPress={item.onPress}
             >
               <View style={styles.menuItemContent}>
@@ -93,7 +89,20 @@ export const AccountScreen: React.FC<Props> = ({ navigation }) => {
             </TouchableOpacity>
           ))}
         </View>
-      </ScrollView>
+
+        <TouchableOpacity
+          style={styles.signOutMenuItem}
+          onPress={handleSignOut}
+        >
+          <View style={styles.menuItemContent}>
+            <Text style={styles.menuItemIcon}>👋</Text>
+            <View style={styles.menuItemText}>
+              <Text style={styles.menuItemTitle}>Sign Out</Text>
+              <Text style={styles.menuItemSubtitle}>Thanks for exploring with us</Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 };
@@ -103,8 +112,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
-  menuContainer: {
+  content: {
+    flex: 1,
     padding: 20,
+  },
+  menuSection: {
+    marginBottom: 24,
   },
   menuItem: {
     backgroundColor: '#fff',
@@ -114,14 +127,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#eee',
   },
-  lastMenuItem: {
-    marginBottom: 0,
-  },
   signOutMenuItem: {
-    marginTop: 24,
-    borderColor: '#eee',
+    marginTop: 'auto',
     backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
     borderWidth: 1,
+    borderColor: '#eee',
     borderStyle: 'dashed',
   },
   menuItemContent: {

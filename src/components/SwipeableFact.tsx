@@ -209,7 +209,7 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontFamily: 'AvenirNext-Bold',
     fontWeight: 'bold',
-    color: '#4A2EFF',
+    color: '#6B4EFF',
   },
   contentContainer: {
     flex: 1,
