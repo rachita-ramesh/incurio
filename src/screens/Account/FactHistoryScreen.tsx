@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { supabase } from '../../api/supabase';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { SparkDetailModal } from '../../components/SparkDetailModal';
 
 type RootStackParamList = {
   Account: undefined;
@@ -22,6 +23,7 @@ interface SparkWithInteraction {
   id: string;
   content: string;
   topic: string;
+  details: string;
   created_at: string;
   interaction_type: 'like' | 'love' | 'dislike';
 }
@@ -29,6 +31,8 @@ interface SparkWithInteraction {
 export const FactHistoryScreen: React.FC<Props> = ({ route, navigation }) => {
   const [loading, setLoading] = useState(true);
   const [sparks, setSparks] = useState<SparkWithInteraction[]>([]);
+  const [selectedSpark, setSelectedSpark] = useState<SparkWithInteraction | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
 
   useEffect(() => {
     loadSparkHistory();
@@ -46,6 +50,7 @@ export const FactHistoryScreen: React.FC<Props> = ({ route, navigation }) => {
           id,
           content,
           topic,
+          details,
           created_at,
           user_interactions!inner (interaction_type)
         `)
@@ -63,6 +68,7 @@ export const FactHistoryScreen: React.FC<Props> = ({ route, navigation }) => {
         id: item.id,
         content: item.content,
         topic: item.topic,
+        details: item.details,
         created_at: item.created_at,
         interaction_type: item.user_interactions[0].interaction_type
       }));
@@ -78,8 +84,16 @@ export const FactHistoryScreen: React.FC<Props> = ({ route, navigation }) => {
     }
   };
 
+  const handleSparkSelect = (spark: SparkWithInteraction) => {
+    setSelectedSpark(spark);
+    setModalVisible(true);
+  };
+
   const renderSparkCard = ({ item }: { item: SparkWithInteraction }) => (
-    <View style={styles.sparkCard}>
+    <TouchableOpacity 
+      style={styles.sparkCard}
+      onPress={() => handleSparkSelect(item)}
+    >
       <View style={styles.sparkHeader}>
         <Text style={styles.sparkTopic}>{item.topic}</Text>
       </View>
@@ -87,7 +101,7 @@ export const FactHistoryScreen: React.FC<Props> = ({ route, navigation }) => {
       <Text style={styles.sparkDate}>
         {new Date(item.created_at).toLocaleDateString()}
       </Text>
-    </View>
+    </TouchableOpacity>
   );
 
   if (loading) {
@@ -126,6 +140,18 @@ export const FactHistoryScreen: React.FC<Props> = ({ route, navigation }) => {
           contentContainerStyle={styles.listContainer}
         />
       )}
+
+      <SparkDetailModal
+        spark={selectedSpark ? {
+          ...selectedSpark,
+          user_interactions: [{ interaction_type: selectedSpark.interaction_type }]
+        } : null}
+        visible={modalVisible}
+        onClose={() => {
+          setModalVisible(false);
+          setSelectedSpark(null);
+        }}
+      />
     </SafeAreaView>
   );
 };
