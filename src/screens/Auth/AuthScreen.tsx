@@ -19,7 +19,7 @@ import { notificationService } from '../../services/notificationService';
 
 type RootStackParamList = {
   Auth: undefined;
-  Home: undefined;
+  Topic: undefined;
 };
 
 type Props = {

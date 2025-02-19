@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontFamily: 'AvenirNext-Bold',
-    color: '#000',
+    color: '#6B4EFF',
     marginBottom: 8,
   },
   subtitle: {

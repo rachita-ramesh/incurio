@@ -12,18 +12,18 @@ import { DAILY_SPARK_KEY } from '../../services/factGenerator';
 import { supabase } from '../../api/supabase';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { SwipeableSpark } from '../../components/SwipeableFact';
-import { SparkConsumedScreen } from '../../components/FactConsumedScreen';
+import { SparkConsumedScreen } from '../../components/SparkConsumedScreen';
 import { useFocusEffect } from '@react-navigation/native';
 import { notificationService } from '../../services/notificationService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type RootStackParamList = {
   Auth: undefined;
-  Home: undefined;
+  Topic: undefined;
   Fact: {
     selectedTopics: string[];
   };
-  Account: undefined;
+  CuriosityHub: undefined;
 };
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Fact'>;
@@ -54,8 +54,8 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
   useEffect(() => {
     navigation.setOptions({
       headerRight: () => (
-        <TouchableOpacity onPress={() => navigation.navigate('Account')} style={styles.accountButton}>
-          <Text style={styles.accountButtonText}>👤</Text>
+        <TouchableOpacity onPress={() => navigation.navigate('CuriosityHub')} style={styles.curiosityHubButton}>
+          <Text style={styles.curiosityHubButtonText}>🧠</Text>
         </TouchableOpacity>
       ),
       headerTitleStyle: {
@@ -357,13 +357,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  accountButton: {
+  curiosityHubButton: {
     paddingHorizontal: 12,
     paddingTop: 4,
     paddingBottom: 10,
   },
-  accountButtonText: {
-    color: '#4285F4',
+  curiosityHubButtonText: {
+    color: '#6B4EFF',
     fontSize: 28,
     fontFamily: 'AvenirNext-Medium',
     fontWeight: '600',

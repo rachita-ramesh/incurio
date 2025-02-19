@@ -38,7 +38,7 @@ class NotificationService {
         channelDescription: 'Daily notification for new facts',
         playSound: true,
         soundName: 'default',
-        importance: 'high',
+        importance: Importance.HIGH,
         vibrate: true,
       },
       (created: boolean) => console.log(`Channel 'daily-facts' created: ${created}`)

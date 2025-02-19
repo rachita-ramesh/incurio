@@ -20,14 +20,15 @@ import { AccountScreen } from './src/screens/Account/AccountScreen';
 import { TopicPreferencesScreen } from './src/screens/Account/TopicPreferencesScreen';
 import { FactHistoryScreen } from './src/screens/Account/FactHistoryScreen';
 import { notificationService } from './src/services/notificationService';
+import { TopicScreen } from './src/screens/Topic/TopicScreen';
 
 type RootStackParamList = {
   Auth: undefined;
-  Home: undefined;
+  Topic: undefined;
   Fact: {
     selectedTopics: string[];
   };
-  Account: undefined;
+  CuriosityHub: undefined;
   TopicPreferences: undefined;
   FactHistory: { filter: 'like' | 'love' | 'dislike' };
 };
@@ -186,8 +187,8 @@ function App(): React.JSX.Element {
           ) : (
             <>
               <Stack.Screen 
-                name="Home" 
-                component={HomeScreen}
+                name="Topic" 
+                component={TopicScreen}
                 options={{ headerShown: false }}
               />
               <Stack.Screen 
@@ -200,11 +201,11 @@ function App(): React.JSX.Element {
                 }}
               />
               <Stack.Screen
-                name="Account"
+                name="CuriosityHub"
                 component={AccountScreen}
                 options={{
                   headerShown: true,
-                  title: 'Account',
+                  title: 'Curiosity Hub',
                   headerBackTitle: 'Back',
                   headerTitleStyle: {
                     fontFamily: 'AvenirNext-Medium',

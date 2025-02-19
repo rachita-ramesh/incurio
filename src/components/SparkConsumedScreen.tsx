@@ -23,7 +23,7 @@ export const SparkConsumedScreen: React.FC = () => {
       <View style={styles.content}>
         <Text style={styles.title}>{randomMessage}</Text>
         <Text style={styles.message}>
-          Come back tomorrow for another spark! Check your account to revisit past discoveries.
+          Come back tomorrow for another spark! Check Curiosity Hub to revisit past discoveries.
         </Text>
       </View>
     </SafeAreaView>
@@ -44,7 +44,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontFamily: 'AvenirNext-Bold',
-    color: '#4A2EFF',
+    color: '#6B4EFF',
     marginBottom: 16,
     textAlign: 'center',
     textShadowColor: 'rgba(74, 46, 255, 0.2)',

@@ -13,7 +13,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 type RootStackParamList = {
   Auth: undefined;
-  Home: undefined;
+  Topic: undefined;
   Fact: { selectedTopics: string[] };
   TopicPreferences: undefined;
   FactHistory: { filter: 'like' | 'love' | 'dislike' };
@@ -39,31 +39,31 @@ export const AccountScreen: React.FC<Props> = ({ navigation }) => {
   const menuItems = [
     {
       title: 'Topic Preferences',
-      subtitle: 'Modify your interests',
+      subtitle: 'Your curiosity compass',
       onPress: () => navigation.navigate('TopicPreferences'),
-      icon: '🎯'
-    },
-    {
-      title: 'Nice Sparks',
-      subtitle: 'Facts you thought were nice',
-      onPress: () => navigation.navigate('FactHistory', { filter: 'like' }),
-      icon: '😎'
+      icon: '📊'
     },
     {
       title: 'Woah Sparks',
-      subtitle: 'Facts that blew your mind',
+      subtitle: 'Mind-blowing discoveries',
       onPress: () => navigation.navigate('FactHistory', { filter: 'love' }),
       icon: '🤯'
     },
     {
+      title: 'Nice Sparks',
+      subtitle: 'Interesting finds',
+      onPress: () => navigation.navigate('FactHistory', { filter: 'like' }),
+      icon: '😎'
+    },
+    {
       title: 'Meh Sparks',
-      subtitle: 'Facts you weren\'t into',
+      subtitle: 'Less exciting ones',
       onPress: () => navigation.navigate('FactHistory', { filter: 'dislike' }),
       icon: '😒'
     },
     {
       title: 'Sign Out',
-      subtitle: 'Log out of your account',
+      subtitle: 'Thanks for exploring with us',
       onPress: handleSignOut,
       icon: '👋'
     }
@@ -72,16 +72,14 @@ export const AccountScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView>
-        <View style={styles.header}>
-          <Text style={styles.title}>Account</Text>
-        </View>
         <View style={styles.menuContainer}>
           {menuItems.map((item, index) => (
             <TouchableOpacity
               key={item.title}
               style={[
                 styles.menuItem,
-                index === menuItems.length - 1 && styles.lastMenuItem
+                index === menuItems.length - 1 && styles.lastMenuItem,
+                index === menuItems.length - 1 && styles.signOutMenuItem
               ]}
               onPress={item.onPress}
             >
@@ -105,18 +103,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
-  header: {
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  title: {
-    fontSize: 28,
-    fontFamily: 'AvenirNext-Bold',
-    color: '#000',
-  },
   menuContainer: {
-    padding: 16,
+    padding: 20,
   },
   menuItem: {
     backgroundColor: '#fff',
@@ -128,6 +116,13 @@ const styles = StyleSheet.create({
   },
   lastMenuItem: {
     marginBottom: 0,
+  },
+  signOutMenuItem: {
+    marginTop: 24,
+    borderColor: '#eee',
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderStyle: 'dashed',
   },
   menuItemContent: {
     flexDirection: 'row',

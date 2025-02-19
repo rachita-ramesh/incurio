@@ -5,17 +5,17 @@ import { TopicSelector } from '../../components/TopicSelector';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 type RootStackParamList = {
-  Home: undefined;
+  Topic: undefined;
   Fact: {
     selectedTopics: string[];
   };
 };
 
 type Props = {
-  navigation: NativeStackNavigationProp<RootStackParamList, 'Home'>;
+  navigation: NativeStackNavigationProp<RootStackParamList, 'Topic'>;
 };
 
-export const HomeScreen: React.FC<Props> = ({ navigation }) => {
+export const TopicScreen: React.FC<Props> = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

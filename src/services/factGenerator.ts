@@ -22,13 +22,30 @@ interface DailySpark {
 }
 
 export const sparkGeneratorService = {
+  selectTopicsWithBandit(userSelectedTopics: string[]): string[] {
+    // 20% chance to explore non-selected topics
+    if (Math.random() < VARIETY_PROBABILITY) {
+      const unselectedTopics = ALL_TOPICS.filter(topic => !userSelectedTopics.includes(topic));
+      if (unselectedTopics.length > 0) {
+        // Pick 1-2 random unselected topics
+        const numTopics = Math.min(1 + Math.floor(Math.random() * 2), unselectedTopics.length);
+        const shuffled = unselectedTopics.sort(() => 0.5 - Math.random());
+        return shuffled.slice(0, numTopics);
+      }
+    }
+    return userSelectedTopics;
+  },
+
   async generateDailySpark(userId: string, selectedTopics: string[], userPreferences: string) {
     const today = new Date().toISOString().split('T')[0];
     const userSparkKey = `${DAILY_SPARK_KEY}_${userId}`;
     
+    // Apply bandit algorithm to potentially include non-selected topics
+    const topicsForGeneration = this.selectTopicsWithBandit(selectedTopics);
+    
     // Generate new spark
-    console.log('Generating new spark for topics:', selectedTopics);
-    const generatedSpark = await generateSpark(selectedTopics, userPreferences);
+    console.log('Generating new spark for topics:', topicsForGeneration);
+    const generatedSpark = await generateSpark(topicsForGeneration, userPreferences);
     
     // Save to Supabase first to get the ID
     const { data: savedSpark, error } = await supabaseApi.saveSpark({
