@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   SafeAreaView,
   Alert,
-  ScrollView,
 } from 'react-native';
 import { sparkGeneratorService } from '../../services/factGenerator';
 import { DAILY_SPARK_KEY } from '../../services/factGenerator';
@@ -44,7 +43,6 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sparkConsumed, setSparkConsumed] = useState(false);
-  const [reaction, setReaction] = useState<'dislike' | 'like' | 'love' | null>(null);
 
   const handleSignOut = async () => {
     try {
@@ -231,27 +229,6 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
     }
   };
 
-  const handleReaction = async (type: 'dislike' | 'like' | 'love') => {
-    setReaction(type);
-    switch (type) {
-      case 'dislike':
-        await handleSwipeLeft();
-        break;
-      case 'like':
-        await handleSwipeRight();
-        break;
-      case 'love':
-        await handleSwipeUp();
-        break;
-    }
-  };
-
-  const handleNext = () => {
-    if (reaction) {
-      setSparkConsumed(true);
-    }
-  };
-
   if (loading) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -287,83 +264,12 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       {spark && (
-        <ScrollView contentContainerStyle={styles.content}>
-          <View style={[styles.factCard, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}>
-            <Text style={[styles.factText, { color: theme.text.primary }]}>
-              {spark.content}
-            </Text>
-            <View style={styles.factMeta}>
-              <Text style={[styles.factCategory, { color: theme.text.secondary }]}>
-                {spark.topic}
-              </Text>
-              <Text style={[styles.factDate, { color: theme.text.secondary }]}>
-                {new Date(spark.details).toLocaleDateString()}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.reactionContainer}>
-            <TouchableOpacity
-              style={[
-                styles.reactionButton,
-                { 
-                  backgroundColor: theme.card,
-                  borderColor: theme.cardBorder,
-                  opacity: reaction === 'dislike' ? 1 : 0.7 
-                }
-              ]}
-              onPress={() => handleReaction('dislike')}
-            >
-              <Text style={styles.reactionEmoji}>👎</Text>
-              <Text style={[styles.reactionText, { color: theme.text.primary }]}>
-                Meh
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.reactionButton,
-                { 
-                  backgroundColor: theme.card,
-                  borderColor: theme.cardBorder,
-                  opacity: reaction === 'like' ? 1 : 0.7 
-                }
-              ]}
-              onPress={() => handleReaction('like')}
-            >
-              <Text style={styles.reactionEmoji}>👍</Text>
-              <Text style={[styles.reactionText, { color: theme.text.primary }]}>
-                Nice
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.reactionButton,
-                { 
-                  backgroundColor: theme.card,
-                  borderColor: theme.cardBorder,
-                  opacity: reaction === 'love' ? 1 : 0.7 
-                }
-              ]}
-              onPress={() => handleReaction('love')}
-            >
-              <Text style={styles.reactionEmoji}>🤯</Text>
-              <Text style={[styles.reactionText, { color: theme.text.primary }]}>
-                Woah
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          <TouchableOpacity
-            style={[styles.nextButton, { backgroundColor: theme.primary }]}
-            onPress={handleNext}
-          >
-            <Text style={styles.nextButtonText}>
-              Next Spark
-            </Text>
-          </TouchableOpacity>
-        </ScrollView>
+        <SwipeableSpark
+          spark={spark}
+          onSwipeLeft={handleSwipeLeft}
+          onSwipeRight={handleSwipeRight}
+          onSwipeUp={handleSwipeUp}
+        />
       )}
     </SafeAreaView>
   );
@@ -383,106 +289,33 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'AvenirNext-Regular',
   },
-  content: {
-    padding: 20,
-  },
-  factCard: {
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 24,
-    borderWidth: 1,
-  },
-  factText: {
-    fontSize: 18,
-    fontFamily: 'AvenirNext-Regular',
-    lineHeight: 26,
-    marginBottom: 16,
-  },
-  factMeta: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  factCategory: {
-    fontSize: 14,
-    fontFamily: 'AvenirNext-Medium',
-  },
-  factDate: {
-    fontSize: 14,
-    fontFamily: 'AvenirNext-Regular',
-  },
-  reactionContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 24,
-  },
-  reactionButton: {
-    flex: 1,
-    marginHorizontal: 6,
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-  },
-  reactionEmoji: {
-    fontSize: 24,
-    marginBottom: 4,
-  },
-  reactionText: {
-    fontSize: 14,
-    fontFamily: 'AvenirNext-Medium',
-  },
-  nextButton: {
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    shadowColor: '#6B4EFF',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 6,
-  },
-  nextButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontFamily: 'AvenirNext-Medium',
-  },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 40,
+    padding: 20,
   },
   errorText: {
-    fontSize: 18,
-    fontFamily: 'AvenirNext-Medium',
+    fontSize: 16,
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 16,
+    fontFamily: 'AvenirNext-Regular',
   },
   retryButton: {
-    backgroundColor: '#4285F4',
+    backgroundColor: '#6B4EFF',
     paddingVertical: 12,
     paddingHorizontal: 24,
-    borderRadius: 8,
+    borderRadius: 12,
   },
   retryButtonText: {
     color: '#fff',
     fontSize: 16,
     fontFamily: 'AvenirNext-Medium',
-    fontWeight: '600',
   },
   curiosityHubButton: {
-    paddingHorizontal: 12,
-    paddingTop: 4,
-    paddingBottom: 10,
+    marginRight: 8,
   },
   curiosityHubButtonText: {
-    color: '#6B4EFF',
-    fontSize: 28,
-    fontFamily: 'AvenirNext-Medium',
-    fontWeight: '600',
+    fontSize: 24,
   },
 }); 

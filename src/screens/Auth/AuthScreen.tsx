@@ -21,6 +21,8 @@ import { useTheme } from '../../theme/ThemeContext';
 type RootStackParamList = {
   Auth: undefined;
   Topic: undefined;
+  Fact: { selectedTopics: string[] };
+  CuriosityHub: undefined;
 };
 
 type Props = {
@@ -138,20 +140,6 @@ export const AuthScreen: React.FC<Props> = ({ navigation }) => {
 
       console.log(`Attempting to ${mode} with Supabase...`);
       
-      if (mode === 'signup') {
-        // Check if user already exists
-        const { data: existingUser, error: checkError } = await supabase
-          .from('users')
-          .select('id')
-          .eq('email', userInfo.data.user.email)
-          .single();
-
-        if (existingUser) {
-          console.log('User already exists, switching to sign in flow');
-          setMode('signin');
-        }
-      }
-
       // Sign in to Supabase using the Google ID token
       const { data: { user, session }, error: signInError } = await supabase.auth.signInWithIdToken({
         provider: 'google',
@@ -164,55 +152,50 @@ export const AuthScreen: React.FC<Props> = ({ navigation }) => {
       }
 
       if (user) {
-        if (mode === 'signup') {
-          // Check if user profile already exists
-          const { data: existingProfile, error: checkError } = await supabase
+        // Check if user profile exists
+        const { data: existingProfile, error: checkError } = await supabase
+          .from('users')
+          .select('preferences')
+          .eq('id', user.id)
+          .single();
+
+        if (!existingProfile) {
+          console.log('Creating new user profile...');
+          const { error: profileError } = await supabase
             .from('users')
-            .select('id')
-            .eq('id', user.id)
-            .single();
+            .insert([
+              {
+                id: user.id,
+                email: user.email,
+                preferences: [],
+                created_at: new Date().toISOString(),
+                last_login: new Date().toISOString()
+              }
+            ]);
 
-          if (!existingProfile) {
-            console.log('Creating new user profile...');
-            const { error: profileError } = await supabase
-              .from('users')
-              .insert([
-                {
-                  id: user.id,
-                  email: user.email,
-                  preferences: [],
-                  created_at: new Date().toISOString(),
-                  last_login: new Date().toISOString()
-                }
-              ]);
-
-            if (profileError) {
-              console.error('Error creating user profile:', profileError);
-              // Continue anyway as auth was successful
-            } else {
-              // Schedule notifications for new users
-              await notificationService.requestPermissions();
-              notificationService.scheduleDailyNotification();
-            }
+          if (profileError) {
+            console.error('Error creating user profile:', profileError);
           } else {
-            console.log('User profile already exists, skipping creation');
+            // Schedule notifications for new users
+            await notificationService.requestPermissions();
+            notificationService.scheduleDailyNotification();
           }
+          navigation.replace('Topic');
         } else {
-          // Update last login for existing users
-          const { error: updateError } = await supabase
+          console.log('User profile exists with preferences:', existingProfile.preferences);
+          // Update last login
+          await supabase
             .from('users')
             .update({ last_login: new Date().toISOString() })
             .eq('id', user.id);
 
-          if (updateError) {
-            console.error('Error updating last login:', updateError);
+          if (existingProfile.preferences?.length > 0) {
+            navigation.replace('Fact', { selectedTopics: existingProfile.preferences });
           } else {
-            console.log('Updated last login timestamp');
+            navigation.replace('Topic');
           }
         }
       }
-
-      console.log(`Successfully ${mode === 'signup' ? 'signed up' : 'signed in'} with Supabase:`, user?.id);
 
     } catch (error: any) {
       console.error('=== Google Auth Error ===');
