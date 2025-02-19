@@ -6,8 +6,10 @@ import {
   TouchableOpacity,
   SafeAreaView,
   Alert,
+  Switch,
 } from 'react-native';
 import { supabase } from '../../api/supabase';
+import { useTheme } from '../../theme/ThemeContext';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 type RootStackParamList = {
@@ -23,6 +25,8 @@ type Props = {
 };
 
 export const AccountSettingsScreen: React.FC<Props> = ({ navigation }) => {
+  const { theme, isDark, toggleTheme } = useTheme();
+
   const handleSignOut = async () => {
     try {
       const { error } = await supabase.auth.signOut();
@@ -39,30 +43,38 @@ export const AccountSettingsScreen: React.FC<Props> = ({ navigation }) => {
       title: 'Topic Preferences',
       subtitle: 'Customize your daily sparks',
       onPress: () => navigation.navigate('TopicPreferences'),
-      icon: '📊'
+      icon: '📊',
+      showToggle: false,
     },
     {
-      title: 'Dark Mode',
-      subtitle: 'Toggle app theme',
-      onPress: () => Alert.alert('Coming Soon', 'Dark mode will be available in the next update!'),
-      icon: '🌓'
+      title: 'Theme',
+      subtitle: isDark ? 'Dark Mode' : 'Light Mode',
+      onPress: toggleTheme,
+      icon: isDark ? '🌙' : '☀️',
+      showToggle: true,
+      isToggled: isDark,
     },
     {
       title: 'Sign Out',
       subtitle: 'See you next time',
       onPress: handleSignOut,
-      icon: '👋'
+      icon: '👋',
+      showToggle: false,
     }
   ];
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.content}>
         {settingsItems.map((item, index) => (
           <TouchableOpacity
             key={item.title}
             style={[
               styles.settingItem,
+              { 
+                backgroundColor: theme.card,
+                borderColor: theme.cardBorder,
+              },
               item.title === 'Sign Out' && styles.signOutItem
             ]}
             onPress={item.onPress}
@@ -72,12 +84,24 @@ export const AccountSettingsScreen: React.FC<Props> = ({ navigation }) => {
               <View style={styles.settingText}>
                 <Text style={[
                   styles.settingTitle,
+                  { color: theme.text.primary },
                   item.title === 'Sign Out' && styles.signOutText
                 ]}>
                   {item.title}
                 </Text>
-                <Text style={styles.settingSubtitle}>{item.subtitle}</Text>
+                <Text style={[styles.settingSubtitle, { color: theme.text.secondary }]}>
+                  {item.subtitle}
+                </Text>
               </View>
+              {item.showToggle && (
+                <Switch
+                  value={item.isToggled}
+                  onValueChange={toggleTheme}
+                  trackColor={{ false: '#767577', true: theme.primary }}
+                  thumbColor={isDark ? '#fff' : '#f4f3f4'}
+                  ios_backgroundColor="#767577"
+                />
+              )}
             </View>
           </TouchableOpacity>
         ))}
@@ -89,19 +113,16 @@ export const AccountSettingsScreen: React.FC<Props> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
   },
   content: {
     flex: 1,
     padding: 20,
   },
   settingItem: {
-    backgroundColor: '#fff',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#eee',
   },
   signOutItem: {
     marginTop: 'auto',
@@ -122,7 +143,6 @@ const styles = StyleSheet.create({
   settingTitle: {
     fontSize: 16,
     fontFamily: 'AvenirNext-Medium',
-    color: '#000',
     marginBottom: 4,
   },
   signOutText: {
@@ -131,6 +151,5 @@ const styles = StyleSheet.create({
   settingSubtitle: {
     fontSize: 14,
     fontFamily: 'AvenirNext-Regular',
-    color: '#666',
   },
 }); 

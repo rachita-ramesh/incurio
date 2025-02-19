@@ -2,13 +2,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { generateSpark } from '../api/openai';
 import { supabaseApi } from '../api/supabase';
 import { notificationService } from './notificationService';
+import { AVAILABLE_TOPICS } from '../constants/topics';
 
 export const DAILY_SPARK_KEY = 'daily_spark';
 export const SPARK_INTERACTION_KEY = 'spark_interaction';
-const ALL_TOPICS = [
-  'Science', 'History', 'Technology', 'Art', 'Literature', 
-  'Philosophy', 'Psychology', 'Space', 'Nature', 'Culture'
-];
 const VARIETY_PROBABILITY = 0.2; // 20% chance to show spark from non-preferred topics
 
 interface DailySpark {
@@ -25,7 +22,7 @@ export const sparkGeneratorService = {
   selectTopicsWithBandit(userSelectedTopics: string[]): string[] {
     // 20% chance to explore non-selected topics
     if (Math.random() < VARIETY_PROBABILITY) {
-      const unselectedTopics = ALL_TOPICS.filter(topic => !userSelectedTopics.includes(topic));
+      const unselectedTopics = AVAILABLE_TOPICS.filter(topic => !userSelectedTopics.includes(topic));
       if (unselectedTopics.length > 0) {
         // Pick 1-2 random unselected topics
         const numTopics = Math.min(1 + Math.floor(Math.random() * 2), unselectedTopics.length);

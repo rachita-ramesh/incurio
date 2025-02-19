@@ -6,6 +6,8 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   SafeAreaView,
+  Alert,
+  ScrollView,
 } from 'react-native';
 import { sparkGeneratorService } from '../../services/factGenerator';
 import { DAILY_SPARK_KEY } from '../../services/factGenerator';
@@ -16,6 +18,7 @@ import { SparkConsumedScreen } from '../../components/SparkConsumedScreen';
 import { useFocusEffect } from '@react-navigation/native';
 import { notificationService } from '../../services/notificationService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useTheme } from '../../theme/ThemeContext';
 
 type RootStackParamList = {
   Auth: undefined;
@@ -36,10 +39,12 @@ interface Spark {
 }
 
 export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
+  const { theme } = useTheme();
   const [spark, setSpark] = useState<Spark | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sparkConsumed, setSparkConsumed] = useState(false);
+  const [reaction, setReaction] = useState<'dislike' | 'like' | 'love' | null>(null);
 
   const handleSignOut = async () => {
     try {
@@ -226,12 +231,35 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
     }
   };
 
+  const handleReaction = async (type: 'dislike' | 'like' | 'love') => {
+    setReaction(type);
+    switch (type) {
+      case 'dislike':
+        await handleSwipeLeft();
+        break;
+      case 'like':
+        await handleSwipeRight();
+        break;
+      case 'love':
+        await handleSwipeUp();
+        break;
+    }
+  };
+
+  const handleNext = () => {
+    if (reaction) {
+      setSparkConsumed(true);
+    }
+  };
+
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4285F4" />
-          <Text style={styles.loadingText}>Generating your daily spark...</Text>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={[styles.loadingText, { color: theme.text.secondary }]}>
+            Generating your daily spark...
+          </Text>
         </View>
       </SafeAreaView>
     );
@@ -239,9 +267,11 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
 
   if (error) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
+          <Text style={[styles.errorText, { color: theme.text.primary }]}>
+            {error}
+          </Text>
           <TouchableOpacity style={styles.retryButton} onPress={loadSpark}>
             <Text style={styles.retryButtonText}>Try Again</Text>
           </TouchableOpacity>
@@ -255,14 +285,85 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       {spark && (
-        <SwipeableSpark
-          spark={spark}
-          onSwipeLeft={handleSwipeLeft}
-          onSwipeRight={handleSwipeRight}
-          onSwipeUp={handleSwipeUp}
-        />
+        <ScrollView contentContainerStyle={styles.content}>
+          <View style={[styles.factCard, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}>
+            <Text style={[styles.factText, { color: theme.text.primary }]}>
+              {spark.content}
+            </Text>
+            <View style={styles.factMeta}>
+              <Text style={[styles.factCategory, { color: theme.text.secondary }]}>
+                {spark.topic}
+              </Text>
+              <Text style={[styles.factDate, { color: theme.text.secondary }]}>
+                {new Date(spark.details).toLocaleDateString()}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.reactionContainer}>
+            <TouchableOpacity
+              style={[
+                styles.reactionButton,
+                { 
+                  backgroundColor: theme.card,
+                  borderColor: theme.cardBorder,
+                  opacity: reaction === 'dislike' ? 1 : 0.7 
+                }
+              ]}
+              onPress={() => handleReaction('dislike')}
+            >
+              <Text style={styles.reactionEmoji}>👎</Text>
+              <Text style={[styles.reactionText, { color: theme.text.primary }]}>
+                Meh
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.reactionButton,
+                { 
+                  backgroundColor: theme.card,
+                  borderColor: theme.cardBorder,
+                  opacity: reaction === 'like' ? 1 : 0.7 
+                }
+              ]}
+              onPress={() => handleReaction('like')}
+            >
+              <Text style={styles.reactionEmoji}>👍</Text>
+              <Text style={[styles.reactionText, { color: theme.text.primary }]}>
+                Nice
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.reactionButton,
+                { 
+                  backgroundColor: theme.card,
+                  borderColor: theme.cardBorder,
+                  opacity: reaction === 'love' ? 1 : 0.7 
+                }
+              ]}
+              onPress={() => handleReaction('love')}
+            >
+              <Text style={styles.reactionEmoji}>🤯</Text>
+              <Text style={[styles.reactionText, { color: theme.text.primary }]}>
+                Woah
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity
+            style={[styles.nextButton, { backgroundColor: theme.primary }]}
+            onPress={handleNext}
+          >
+            <Text style={styles.nextButtonText}>
+              Next Spark
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
       )}
     </SafeAreaView>
   );
@@ -271,13 +372,6 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
-  },
-  content: {
-    flex: 1,
-    padding: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   loadingContainer: {
     flex: 1,
@@ -288,20 +382,85 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 16,
     fontFamily: 'AvenirNext-Regular',
-    color: '#666',
+  },
+  content: {
+    padding: 20,
+  },
+  factCard: {
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 24,
+    borderWidth: 1,
+  },
+  factText: {
+    fontSize: 18,
+    fontFamily: 'AvenirNext-Regular',
+    lineHeight: 26,
+    marginBottom: 16,
+  },
+  factMeta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  factCategory: {
+    fontSize: 14,
+    fontFamily: 'AvenirNext-Medium',
+  },
+  factDate: {
+    fontSize: 14,
+    fontFamily: 'AvenirNext-Regular',
+  },
+  reactionContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+  },
+  reactionButton: {
+    flex: 1,
+    marginHorizontal: 6,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+  reactionEmoji: {
+    fontSize: 24,
+    marginBottom: 4,
+  },
+  reactionText: {
+    fontSize: 14,
+    fontFamily: 'AvenirNext-Medium',
+  },
+  nextButton: {
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    shadowColor: '#6B4EFF',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 6,
+  },
+  nextButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'AvenirNext-Medium',
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: 40,
   },
   errorText: {
-    fontSize: 16,
-    fontFamily: 'AvenirNext-Regular',
-    color: '#f44336',
+    fontSize: 18,
+    fontFamily: 'AvenirNext-Medium',
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: 8,
   },
   retryButton: {
     backgroundColor: '#4285F4',
@@ -313,48 +472,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontFamily: 'AvenirNext-Medium',
-    fontWeight: '600',
-  },
-  topicLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
-  },
-  topic: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#4285F4',
-    marginBottom: 24,
-  },
-  factCard: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 16,
-    padding: 24,
-    width: '100%',
-    marginBottom: 32,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  factText: {
-    fontSize: 18,
-    lineHeight: 28,
-    color: '#333',
-  },
-  refreshButton: {
-    backgroundColor: '#4285F4',
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 12,
-  },
-  refreshButtonText: {
-    color: '#fff',
-    fontSize: 16,
     fontWeight: '600',
   },
   curiosityHubButton: {

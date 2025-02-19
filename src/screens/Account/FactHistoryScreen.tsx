@@ -11,6 +11,7 @@ import {
 import { supabase } from '../../api/supabase';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { SparkDetailModal } from '../../components/SparkDetailModal';
+import { useTheme } from '../../theme/ThemeContext';
 
 type RootStackParamList = {
   Account: undefined;
@@ -29,6 +30,7 @@ interface SparkWithInteraction {
 }
 
 export const FactHistoryScreen: React.FC<Props> = ({ route, navigation }) => {
+  const { theme } = useTheme();
   const [loading, setLoading] = useState(true);
   const [sparks, setSparks] = useState<SparkWithInteraction[]>([]);
   const [selectedSpark, setSelectedSpark] = useState<SparkWithInteraction | null>(null);
@@ -91,14 +93,20 @@ export const FactHistoryScreen: React.FC<Props> = ({ route, navigation }) => {
 
   const renderSparkCard = ({ item }: { item: SparkWithInteraction }) => (
     <TouchableOpacity 
-      style={styles.sparkCard}
+      style={[
+        styles.sparkCard,
+        { 
+          backgroundColor: theme.card,
+          borderColor: theme.cardBorder
+        }
+      ]}
       onPress={() => handleSparkSelect(item)}
     >
       <View style={styles.sparkHeader}>
         <Text style={styles.sparkTopic}>{item.topic}</Text>
       </View>
-      <Text style={styles.sparkContent}>{item.content}</Text>
-      <Text style={styles.sparkDate}>
+      <Text style={[styles.sparkContent, { color: theme.text.primary }]}>{item.content}</Text>
+      <Text style={[styles.sparkDate, { color: theme.text.secondary }]}>
         {new Date(item.created_at).toLocaleDateString()}
       </Text>
     </TouchableOpacity>
@@ -106,38 +114,60 @@ export const FactHistoryScreen: React.FC<Props> = ({ route, navigation }) => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4285F4" />
-          <Text style={styles.loadingText}>Loading your spark history...</Text>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={[styles.loadingText, { color: theme.text.primary }]}>Loading your spark history...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.header}>
         <Text style={styles.title}>
           {route.params.filter === 'like' ? 'Nice Sparks 😎' :
            route.params.filter === 'love' ? 'Woah Sparks 🤯' :
            'Meh Sparks 😒'}
         </Text>
+        <Text style={[styles.subtitle, { color: theme.text.secondary }]}>
+          {sparks.length} {sparks.length === 1 ? 'spark' : 'sparks'}
+        </Text>
       </View>
       {sparks.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>
-            No {route.params.filter === 'like' ? 'nice' :
-                route.params.filter === 'love' ? 'woah' :
-                'meh'} sparks yet
+        <View style={[styles.emptyContainer, { backgroundColor: theme.background }]}>
+          <Text style={[styles.emptyText, { color: theme.text.secondary }]}>
+            No {route.params.filter === 'like' ? 'nice 😎' :
+                route.params.filter === 'love' ? 'woah 🤯' :
+                'meh 😒'} sparks yet
           </Text>
         </View>
       ) : (
         <FlatList
           data={sparks}
-          renderItem={renderSparkCard}
+          renderItem={({ item }) => (
+            <TouchableOpacity 
+              style={[
+                styles.sparkCard,
+                { 
+                  backgroundColor: theme.card,
+                  borderColor: theme.cardBorder
+                }
+              ]}
+              onPress={() => handleSparkSelect(item)}
+            >
+              <View style={styles.sparkHeader}>
+                <Text style={styles.sparkTopic}>{item.topic}</Text>
+              </View>
+              <Text style={[styles.sparkContent, { color: theme.text.primary }]}>{item.content}</Text>
+              <Text style={[styles.sparkDate, { color: theme.text.secondary }]}>
+                {new Date(item.created_at).toLocaleDateString()}
+              </Text>
+            </TouchableOpacity>
+          )}
           keyExtractor={item => item.id}
-          contentContainerStyle={styles.listContainer}
+          contentContainerStyle={[styles.listContainer, { padding: 20 }]}
         />
       )}
 
@@ -159,17 +189,20 @@ export const FactHistoryScreen: React.FC<Props> = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
   },
   header: {
     padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    paddingBottom: 12,
   },
   title: {
     fontSize: 28,
     fontFamily: 'AvenirNext-Bold',
+    marginBottom: 4,
     color: '#6B4EFF',
+  },
+  subtitle: {
+    fontSize: 16,
+    fontFamily: 'AvenirNext-Regular',
   },
   loadingContainer: {
     flex: 1,
@@ -180,7 +213,6 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 16,
     fontFamily: 'AvenirNext-Regular',
-    color: '#666',
   },
   listContainer: {
     padding: 16,
@@ -201,8 +233,8 @@ const styles = StyleSheet.create({
   },
   sparkTopic: {
     fontSize: 14,
-    color: '#6B4EFF',
     fontFamily: 'AvenirNext-Medium',
+    color: '#6B4EFF',
   },
   sparkContent: {
     fontSize: 16,

@@ -6,32 +6,20 @@ import {
   TouchableOpacity,
   ScrollView,
 } from 'react-native';
-
-const AVAILABLE_TOPICS = [
-  'Science',
-  'History',
-  'Technology',
-  'Art',
-  'Literature',
-  'Philosophy',
-  'Psychology',
-  'Space',
-  'Nature',
-  'Culture'
-];
+import { AVAILABLE_TOPICS, Topic } from '../constants/topics';
 
 interface TopicSelectorProps {
-  onTopicsSelected: (topics: string[]) => void;
-  initialTopics?: string[];
+  onTopicsSelected: (topics: Topic[]) => void;
+  initialTopics?: Topic[];
 }
 
 export const TopicSelector: React.FC<TopicSelectorProps> = ({
   onTopicsSelected,
   initialTopics = []
 }) => {
-  const [selectedTopics, setSelectedTopics] = useState<string[]>(initialTopics);
+  const [selectedTopics, setSelectedTopics] = useState<Topic[]>(initialTopics);
 
-  const toggleTopic = (topic: string) => {
+  const toggleTopic = (topic: Topic) => {
     const newTopics = selectedTopics.includes(topic)
       ? selectedTopics.filter(t => t !== topic)
       : [...selectedTopics, topic];

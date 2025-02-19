@@ -13,6 +13,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../../api/supabase';
 import { SparkDetailModal } from '../../components/SparkDetailModal';
 import { useDebounce } from '../../hooks/useDebounce';
+import { useTheme } from '../../theme/ThemeContext';
 
 const RECENT_SEARCHES_KEY = 'recent_searches';
 const MAX_RECENT_SEARCHES = 3;
@@ -27,6 +28,7 @@ interface Spark {
 }
 
 export const SparkSearchScreen = () => {
+  const { theme } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [results, setResults] = useState<Spark[]>([]);
@@ -133,49 +135,29 @@ export const SparkSearchScreen = () => {
     }
   };
 
-  const renderSparkItem = ({ item }: { item: Spark }) => (
-    <TouchableOpacity 
-      style={styles.sparkItem}
-      onPress={() => handleSparkSelect(item)}
-    >
-      <View style={styles.sparkHeader}>
-        <Text style={styles.sparkTopic}>{item.topic}</Text>
-        <Text style={styles.interactionEmoji}>
-          {getInteractionEmoji(item.user_interactions[0].interaction_type)}
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+      <View style={styles.header}>
+        <Text style={[styles.title, { color: theme.text.primary }]}>Search Sparks</Text>
+        <Text style={[styles.subtitle, { color: theme.text.secondary }]}>
+          Find your past discoveries
         </Text>
       </View>
-      <Text style={styles.sparkContent} numberOfLines={2}>
-        {item.content}
-      </Text>
-      <Text style={styles.sparkDate}>
-        {new Date(item.created_at).toLocaleDateString()}
-      </Text>
-    </TouchableOpacity>
-  );
 
-  const renderRecentSearch = ({ item }: { item: string }) => (
-    <TouchableOpacity 
-      style={styles.recentSearchItem}
-      onPress={() => setSearchQuery(item)}
-    >
-      <Text style={styles.recentSearchIcon}>🕒</Text>
-      <Text style={styles.recentSearchText}>{item}</Text>
-    </TouchableOpacity>
-  );
-
-  return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Search Sparks</Text>
-        <Text style={styles.subtitle}>Find your past discoveries</Text>
-      </View>
-      <View style={styles.searchContainer}>
+      <View style={[styles.searchContainer, { borderBottomColor: theme.divider }]}>
         <TextInput
-          style={styles.searchInput}
+          style={[
+            styles.searchInput,
+            { 
+              backgroundColor: theme.card,
+              color: theme.text.primary,
+              borderColor: theme.cardBorder
+            }
+          ]}
           placeholder="Search your sparks..."
           value={searchQuery}
           onChangeText={setSearchQuery}
-          placeholderTextColor="#666"
+          placeholderTextColor={theme.text.secondary}
           autoFocus
           onSubmitEditing={() => {
             if (searchQuery.trim()) {
@@ -188,17 +170,32 @@ export const SparkSearchScreen = () => {
         {loading && (
           <ActivityIndicator 
             style={styles.loadingIndicator} 
-            color="#6B4EFF" 
+            color={theme.primary}
           />
         )}
       </View>
 
       {!searchQuery && recentSearches.length > 0 && (
         <View style={styles.recentSearchesContainer}>
-          <Text style={styles.recentSearchesTitle}>Recent Searches</Text>
+          <Text style={[styles.recentSearchesTitle, { color: theme.text.secondary }]}>
+            Recent Searches
+          </Text>
           <FlatList
             data={recentSearches}
-            renderItem={renderRecentSearch}
+            renderItem={({ item }) => (
+              <TouchableOpacity 
+                style={[
+                  styles.recentSearchItem,
+                  { borderBottomColor: theme.divider }
+                ]}
+                onPress={() => setSearchQuery(item)}
+              >
+                <Text style={styles.recentSearchIcon}>🕒</Text>
+                <Text style={[styles.recentSearchText, { color: theme.text.primary }]}>
+                  {item}
+                </Text>
+              </TouchableOpacity>
+            )}
             keyExtractor={item => item}
           />
         </View>
@@ -207,11 +204,40 @@ export const SparkSearchScreen = () => {
       {searchQuery && (
         <FlatList
           data={results}
-          renderItem={renderSparkItem}
+          renderItem={({ item }) => (
+            <TouchableOpacity 
+              style={[
+                styles.sparkItem,
+                { 
+                  backgroundColor: theme.card,
+                  borderColor: theme.cardBorder
+                }
+              ]}
+              onPress={() => handleSparkSelect(item)}
+            >
+              <View style={styles.sparkHeader}>
+                <Text style={[styles.sparkTopic, { color: theme.primary }]}>
+                  {item.topic}
+                </Text>
+                <Text style={styles.interactionEmoji}>
+                  {getInteractionEmoji(item.user_interactions[0].interaction_type)}
+                </Text>
+              </View>
+              <Text 
+                style={[styles.sparkContent, { color: theme.text.primary }]} 
+                numberOfLines={2}
+              >
+                {item.content}
+              </Text>
+              <Text style={[styles.sparkDate, { color: theme.text.secondary }]}>
+                {new Date(item.created_at).toLocaleDateString()}
+              </Text>
+            </TouchableOpacity>
+          )}
           keyExtractor={item => item.id}
           contentContainerStyle={styles.resultsList}
           ListEmptyComponent={
-            <Text style={[styles.emptyText, { display: loading ? 'none' : 'flex' }]}>
+            <Text style={[styles.emptyText, { color: theme.text.secondary }]}>
               No sparks found matching your search
             </Text>
           }
@@ -233,40 +259,33 @@ export const SparkSearchScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
   },
   header: {
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
   },
   title: {
     fontSize: 28,
     fontFamily: 'AvenirNext-Bold',
-    color: '#6B4EFF',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
     fontFamily: 'AvenirNext-Regular',
-    color: '#666',
   },
   searchContainer: {
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
     flexDirection: 'row',
     alignItems: 'center',
   },
   searchInput: {
     flex: 1,
     height: 40,
-    backgroundColor: '#F8F5FF',
     borderRadius: 20,
     paddingHorizontal: 16,
     fontSize: 16,
     fontFamily: 'AvenirNext-Regular',
-    color: '#000',
   },
   loadingIndicator: {
     marginLeft: 8,
@@ -277,7 +296,6 @@ const styles = StyleSheet.create({
   recentSearchesTitle: {
     fontSize: 14,
     fontFamily: 'AvenirNext-Medium',
-    color: '#666',
     marginBottom: 12,
   },
   recentSearchItem: {
@@ -285,7 +303,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
   },
   recentSearchIcon: {
     fontSize: 16,
@@ -294,18 +311,15 @@ const styles = StyleSheet.create({
   recentSearchText: {
     fontSize: 16,
     fontFamily: 'AvenirNext-Regular',
-    color: '#2F3542',
   },
   resultsList: {
     padding: 16,
   },
   sparkItem: {
-    backgroundColor: '#fff',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#eee',
   },
   sparkHeader: {
     flexDirection: 'row',
@@ -315,7 +329,6 @@ const styles = StyleSheet.create({
   },
   sparkTopic: {
     fontSize: 14,
-    color: '#6B4EFF',
     fontFamily: 'AvenirNext-Medium',
   },
   interactionEmoji: {
@@ -323,19 +336,16 @@ const styles = StyleSheet.create({
   },
   sparkContent: {
     fontSize: 16,
-    color: '#2F3542',
     fontFamily: 'AvenirNext-Regular',
     lineHeight: 22,
     marginBottom: 8,
   },
   sparkDate: {
     fontSize: 12,
-    color: '#666',
     fontFamily: 'AvenirNext-Regular',
   },
   emptyText: {
     textAlign: 'center',
-    color: '#666',
     fontFamily: 'AvenirNext-Regular',
     fontSize: 16,
     marginTop: 32,

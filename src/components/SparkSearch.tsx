@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { supabaseApi } from '../api/supabase';
 import { useDebounce } from '../hooks/useDebounce';
+import { useTheme } from '../theme/ThemeContext';
 
 interface Spark {
   id: string;
@@ -26,6 +27,7 @@ interface SparkSearchProps {
 }
 
 export const SparkSearch: React.FC<SparkSearchProps> = ({ userId, onSparkSelect }) => {
+  const { theme } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [results, setResults] = useState<Spark[]>([]);
   const [loading, setLoading] = useState(false);
@@ -62,38 +64,51 @@ export const SparkSearch: React.FC<SparkSearchProps> = ({ userId, onSparkSelect 
 
   const renderSparkItem = ({ item }: { item: Spark }) => (
     <TouchableOpacity 
-      style={styles.sparkItem}
+      style={[
+        styles.sparkItem,
+        { 
+          backgroundColor: theme.card,
+          borderColor: theme.cardBorder
+        }
+      ]}
       onPress={() => onSparkSelect(item)}
     >
       <View style={styles.sparkHeader}>
-        <Text style={styles.sparkTopic}>{item.topic}</Text>
+        <Text style={[styles.sparkTopic, { color: theme.primary }]}>{item.topic}</Text>
         <Text style={styles.interactionEmoji}>
           {getInteractionEmoji(item.user_interactions[0].interaction_type)}
         </Text>
       </View>
-      <Text style={styles.sparkContent} numberOfLines={2}>
+      <Text style={[styles.sparkContent, { color: theme.text.primary }]} numberOfLines={2}>
         {item.content}
       </Text>
-      <Text style={styles.sparkDate}>
+      <Text style={[styles.sparkDate, { color: theme.text.secondary }]}>
         {new Date(item.created_at).toLocaleDateString()}
       </Text>
     </TouchableOpacity>
   );
 
   return (
-    <View style={styles.container}>
-      <View style={styles.searchContainer}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <View style={[styles.searchContainer, { borderBottomColor: theme.divider }]}>
         <TextInput
-          style={styles.searchInput}
+          style={[
+            styles.searchInput,
+            { 
+              backgroundColor: theme.card,
+              color: theme.text.primary,
+              borderColor: theme.cardBorder
+            }
+          ]}
           placeholder="Search your sparks..."
           value={searchQuery}
           onChangeText={setSearchQuery}
-          placeholderTextColor="#666"
+          placeholderTextColor={theme.text.secondary}
         />
         {loading && (
           <ActivityIndicator 
             style={styles.loadingIndicator} 
-            color="#6B4EFF" 
+            color={theme.primary}
           />
         )}
       </View>
@@ -104,7 +119,7 @@ export const SparkSearch: React.FC<SparkSearchProps> = ({ userId, onSparkSelect 
         contentContainerStyle={styles.resultsList}
         ListEmptyComponent={
           searchQuery ? (
-            <Text style={styles.emptyText}>
+            <Text style={[styles.emptyText, { color: theme.text.secondary }]}>
               No sparks found matching your search
             </Text>
           ) : null
@@ -121,7 +136,6 @@ const styles = StyleSheet.create({
   searchContainer: {
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
     flexDirection: 'row',
     alignItems: 'center',
   },

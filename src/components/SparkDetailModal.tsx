@@ -8,6 +8,7 @@ import {
   ScrollView,
   SafeAreaView,
 } from 'react-native';
+import { useTheme } from '../theme/ThemeContext';
 
 interface Spark {
   id: string;
@@ -29,6 +30,8 @@ export const SparkDetailModal: React.FC<SparkDetailModalProps> = ({
   visible,
   onClose,
 }) => {
+  const { theme } = useTheme();
+  
   if (!spark) return null;
 
   const getInteractionEmoji = (type: 'love' | 'like' | 'dislike') => {
@@ -47,11 +50,14 @@ export const SparkDetailModal: React.FC<SparkDetailModalProps> = ({
       onRequestClose={onClose}
     >
       <SafeAreaView style={styles.modalContainer}>
-        <View style={styles.modalContent}>
-          <View style={styles.modalHeader}>
+        <View style={[styles.modalContent, { backgroundColor: theme.background }]}>
+          <View style={[styles.modalHeader, { 
+            borderBottomColor: theme.cardBorder,
+            backgroundColor: theme.surface
+          }]}>
             <View style={styles.headerContent}>
-              <Text style={styles.topic}>{spark.topic.toUpperCase()}</Text>
-              <Text style={styles.interaction}>
+              <Text style={[styles.topic, { color: theme.primary }]}>{spark.topic.toUpperCase()}</Text>
+              <Text style={[styles.interaction, { color: theme.text.primary }]}>
                 {getInteractionEmoji(spark.user_interactions[0].interaction_type)}
               </Text>
             </View>
@@ -59,16 +65,16 @@ export const SparkDetailModal: React.FC<SparkDetailModalProps> = ({
               style={styles.closeButton}
               onPress={onClose}
             >
-              <Text style={styles.closeButtonText}>×</Text>
+              <Text style={[styles.closeButtonText, { color: theme.primary }]}>×</Text>
             </TouchableOpacity>
           </View>
           
           <ScrollView style={styles.scrollView}>
-            <Text style={styles.content}>{spark.content}</Text>
-            <View style={styles.divider} />
-            <Text style={styles.detailsTitle}>DIVE DEEPER</Text>
-            <Text style={styles.details}>{spark.details}</Text>
-            <Text style={styles.date}>
+            <Text style={[styles.content, { color: theme.text.primary }]}>{spark.content}</Text>
+            <View style={[styles.divider, { backgroundColor: theme.divider }]} />
+            <Text style={[styles.detailsTitle, { color: theme.primary }]}>DIVE DEEPER</Text>
+            <Text style={[styles.details, { color: theme.text.primary }]}>{spark.details}</Text>
+            <Text style={[styles.date, { color: theme.text.secondary }]}>
               Discovered on {new Date(spark.created_at).toLocaleDateString()}
             </Text>
           </ScrollView>

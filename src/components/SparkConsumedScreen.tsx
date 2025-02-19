@@ -5,6 +5,7 @@ import {
   StyleSheet,
   SafeAreaView,
 } from 'react-native';
+import { useTheme } from '../theme/ThemeContext';
 
 const MESSAGES = [
   "Curiosity Sparked! ⚡",
@@ -15,14 +16,14 @@ const MESSAGES = [
 ];
 
 export const SparkConsumedScreen: React.FC = () => {
-  // Randomly select a message
+  const { theme } = useTheme();
   const randomMessage = MESSAGES[Math.floor(Math.random() * MESSAGES.length)];
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.content}>
         <Text style={styles.title}>{randomMessage}</Text>
-        <Text style={styles.message}>
+        <Text style={[styles.message, { color: theme.text.primary }]}>
           Come back tomorrow for another spark! {'\n'}
           Tap 🧠 to explore your collection of sparks.
         </Text>

@@ -7,6 +7,7 @@ import {
   SafeAreaView,
 } from 'react-native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useTheme } from '../../theme/ThemeContext';
 
 type RootStackParamList = {
   Auth: undefined;
@@ -24,6 +25,8 @@ type Props = {
 };
 
 export const CuriosityHubScreen: React.FC<Props> = ({ navigation }) => {
+  const { theme } = useTheme();
+
   const menuItems = [
     {
       title: 'Search Sparks',
@@ -58,19 +61,29 @@ export const CuriosityHubScreen: React.FC<Props> = ({ navigation }) => {
   ];
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.content}>
-        {menuItems.map((item, index) => (
+        {menuItems.map((item) => (
           <TouchableOpacity
             key={item.title}
-            style={[styles.menuItem]}
+            style={[
+              styles.menuItem,
+              { 
+                backgroundColor: theme.card,
+                borderColor: theme.cardBorder
+              }
+            ]}
             onPress={item.onPress}
           >
             <View style={styles.menuItemContent}>
               <Text style={styles.menuItemIcon}>{item.icon}</Text>
               <View style={styles.menuItemText}>
-                <Text style={styles.menuItemTitle}>{item.title}</Text>
-                <Text style={styles.menuItemSubtitle}>{item.subtitle}</Text>
+                <Text style={[styles.menuItemTitle, { color: theme.text.primary }]}>
+                  {item.title}
+                </Text>
+                <Text style={[styles.menuItemSubtitle, { color: theme.text.secondary }]}>
+                  {item.subtitle}
+                </Text>
               </View>
             </View>
           </TouchableOpacity>
@@ -83,19 +96,16 @@ export const CuriosityHubScreen: React.FC<Props> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
   },
   content: {
     flex: 1,
     padding: 20,
   },
   menuItem: {
-    backgroundColor: '#fff',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#eee',
   },
   menuItemContent: {
     flexDirection: 'row',
@@ -112,12 +122,10 @@ const styles = StyleSheet.create({
   menuItemTitle: {
     fontSize: 16,
     fontFamily: 'AvenirNext-Medium',
-    color: '#000',
     marginBottom: 4,
   },
   menuItemSubtitle: {
     fontSize: 14,
     fontFamily: 'AvenirNext-Regular',
-    color: '#666',
   },
 }); 

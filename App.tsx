@@ -8,21 +8,22 @@
 import React, { useEffect, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { View, ActivityIndicator, Linking } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { NavigationContainer, DefaultTheme, DarkTheme, useNavigation } from '@react-navigation/native';
+import { createNativeStackNavigator, NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { supabase } from './src/api/supabase';
 import { AuthScreen } from './src/screens/Auth/AuthScreen';
 import { TopicScreen } from './src/screens/Topic/TopicScreen';
 import { FactScreen } from './src/screens/Fact/FactScreen';
-import { AccountScreen } from './src/screens/Account/AccountScreen';
+import { CuriosityHubScreen } from './src/screens/Account/CuriosityHubScreen';
 import { SparkSearchScreen } from './src/screens/Search/SparkSearchScreen';
 import { notificationService } from './src/services/notificationService';
 import { Session } from '@supabase/supabase-js';
 import { TopicPreferencesScreen } from './src/screens/Account/TopicPreferencesScreen';
 import { FactHistoryScreen } from './src/screens/Account/FactHistoryScreen';
 import { AccountSettingsScreen } from './src/screens/Account/AccountSettingsScreen';
-import { CuriosityHubScreen } from './src/screens/Account/CuriosityHubScreen';
+import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
+import { lightTheme, darkTheme } from './src/theme/colors';
 
 export type RootStackParamList = {
   Auth: undefined;
@@ -39,9 +40,90 @@ export type RootStackParamList = {
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
-function App(): React.JSX.Element {
+const AuthStateHandler = ({ session }: { session: Session | null }) => {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+
+  useEffect(() => {
+    const handleAuthChange = async () => {
+      if (session?.user) {
+        const { data: userData, error } = await supabase
+          .from('users')
+          .select('id, preferences')
+          .eq('id', session.user.id)
+          .single();
+
+        if (!userData) {
+          console.log('New user detected, creating profile...');
+          const { error: profileError } = await supabase
+            .from('users')
+            .insert([
+              {
+                id: session.user.id,
+                email: session.user.email,
+                preferences: [],
+                created_at: new Date().toISOString(),
+                last_login: new Date().toISOString()
+              }
+            ]);
+
+          if (profileError) {
+            console.error('Error creating user profile:', profileError);
+          } else {
+            console.log('User profile created successfully');
+            navigation.navigate('TopicPreferences');
+          }
+        } else {
+          // Update last login for existing users
+          const { error: updateError } = await supabase
+            .from('users')
+            .update({ last_login: new Date().toISOString() })
+            .eq('id', session.user.id);
+
+          if (updateError) {
+            console.error('Error updating last login:', updateError);
+          } else {
+            console.log('Updated last login timestamp');
+            // Check if user has preferences set
+            if (userData.preferences && userData.preferences.length > 0) {
+              // User has preferences, navigate to Fact screen
+              navigation.navigate('Fact', { selectedTopics: userData.preferences });
+            } else {
+              // User needs to set preferences
+              navigation.navigate('TopicPreferences');
+            }
+          }
+        }
+      }
+    };
+
+    handleAuthChange();
+  }, [session, navigation]);
+
+  return null;
+};
+
+function AppContent(): React.JSX.Element {
   const [initializing, setInitializing] = useState(true);
   const [session, setSession] = useState<Session | null>(null);
+  const { isDark, theme } = useTheme();
+
+  console.log('=== AppContent Render ===');
+  console.log('Initializing:', initializing);
+  console.log('Session:', session ? 'exists' : 'null');
+  console.log('Theme:', isDark ? 'dark' : 'light');
+
+  // Customize navigation theme
+  const navigationTheme = {
+    ...(isDark ? DarkTheme : DefaultTheme),
+    colors: {
+      ...(isDark ? DarkTheme.colors : DefaultTheme.colors),
+      primary: theme.primary,
+      background: theme.background,
+      card: theme.card,
+      text: theme.text.primary,
+      border: theme.border,
+    },
+  };
 
   useEffect(() => {
     const setup = async () => {
@@ -120,36 +202,6 @@ function App(): React.JSX.Element {
           console.log('=== Auth State Changed ===');
           console.log('Event:', event);
           console.log('Session:', newSession?.user?.id || 'None');
-
-          if (event === 'SIGNED_IN') {
-            console.log('User signed in:', newSession?.user?.id);
-            // Check if this is a new user (first time sign up)
-            const { data: existingUser } = await supabase
-              .from('users')
-              .select('id')
-              .eq('id', newSession?.user?.id)
-              .single();
-
-            if (!existingUser && newSession?.user) {
-              console.log('New user detected, creating profile...');
-              const { error: profileError } = await supabase
-                .from('users')
-                .insert([
-                  {
-                    id: newSession.user.id,
-                    email: newSession.user.email,
-                    preferences: []
-                  }
-                ]);
-
-              if (profileError) {
-                console.error('Error creating user profile:', profileError);
-              } else {
-                console.log('User profile created successfully');
-              }
-            }
-          }
-
           setSession(newSession);
         });
 
@@ -171,127 +223,136 @@ function App(): React.JSX.Element {
   }, []);
 
   if (initializing) return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" />
-      </View>
-    </GestureHandlerRootView>
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background }}>
+      <ActivityIndicator size="large" color={theme.primary} />
+    </View>
   );
   
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <NavigationContainer>
-        <Stack.Navigator>
-          {!session ? (
+    <NavigationContainer theme={navigationTheme}>
+      <Stack.Navigator>
+        {!session ? (
+          <Stack.Screen 
+            name="Auth" 
+            component={AuthScreen} 
+            options={{ headerShown: false }}
+          />
+        ) : (
+          <>
             <Stack.Screen 
-              name="Auth" 
-              component={AuthScreen} 
+              name="Topic" 
+              component={TopicScreen}
               options={{ headerShown: false }}
             />
-          ) : (
-            <>
-              <Stack.Screen 
-                name="Topic" 
-                component={TopicScreen}
-                options={{ headerShown: false }}
-              />
-              <Stack.Screen 
-                name="Fact" 
-                component={FactScreen}
-                options={{ 
-                  headerShown: true,
-                  title: 'Daily Spark',
-                  headerBackTitle: 'Back',
-                  headerTintColor: '#6B4EFF',
-                  headerTitleStyle: {
-                    fontFamily: 'AvenirNext-Medium',
-                    color: '#6B4EFF'
-                  },
-                }}
-              />
-              <Stack.Screen
-                name="CuriosityHub"
-                component={CuriosityHubScreen}
-                options={{
-                  headerShown: true,
-                  title: 'Curiosity Hub',
-                  headerBackTitle: 'Back',
-                  headerTintColor: '#6B4EFF',
-                  headerTitleStyle: {
-                    fontFamily: 'AvenirNext-Medium',
-                    fontSize: 20,
-                    color: '#6B4EFF'
-                  },
-                  headerBackTitleStyle: {
-                    fontFamily: 'AvenirNext-Regular',
-                  },
-                }}
-              />
-              <Stack.Screen
-                name="TopicPreferences"
-                component={TopicPreferencesScreen}
-                options={{
-                  headerShown: true,
-                  headerBackTitle: 'Back',
-                  title: '',
-                  headerTintColor: '#6B4EFF',
-                  headerTitleStyle: {
-                    fontFamily: 'AvenirNext-Medium',
-                  },
-                }}
-              />
-              <Stack.Screen
-                name="FactHistory"
-                component={FactHistoryScreen}
-                options={{
-                  headerShown: true,
-                  headerBackTitle: 'Back',
-                  title: '',
-                  headerTintColor: '#6B4EFF',
-                  headerTitleStyle: {
-                    fontFamily: 'AvenirNext-Medium',
-                  },
-                }}
-              />
-              <Stack.Screen
-                name="SparkSearch"
-                component={SparkSearchScreen}
-                options={{
-                  headerShown: true,
-                  headerBackTitle: 'Back',
-                  title: '',
-                  headerTintColor: '#6B4EFF',
-                  headerTitleStyle: {
-                    fontFamily: 'AvenirNext-Medium',
-                  },
-                  headerBackTitleStyle: {
-                    fontFamily: 'AvenirNext-Regular',
-                  },
-                }}
-              />
-              <Stack.Screen
-                name="AccountSettings"
-                component={AccountSettingsScreen}
-                options={{
-                  headerShown: true,
-                  title: 'Account',
-                  headerBackTitle: 'Back',
-                  headerTintColor: '#6B4EFF',
-                  headerTitleStyle: {
-                    fontFamily: 'AvenirNext-Medium',
-                    fontSize: 20,
-                    color: '#6B4EFF'
-                  },
-                  headerBackTitleStyle: {
-                    fontFamily: 'AvenirNext-Regular',
-                  },
-                }}
-              />
-            </>
-          )}
-        </Stack.Navigator>
-      </NavigationContainer>
-    </GestureHandlerRootView>
+            <Stack.Screen 
+              name="Fact" 
+              component={FactScreen}
+              options={{ 
+                headerShown: true,
+                title: 'Daily Spark',
+                headerBackTitle: 'Back',
+                headerTintColor: theme.primary,
+                headerTitleStyle: {
+                  fontFamily: 'AvenirNext-Medium',
+                  color: theme.primary
+                },
+              }}
+            />
+            <Stack.Screen
+              name="CuriosityHub"
+              component={CuriosityHubScreen}
+              options={{
+                headerShown: true,
+                title: 'Curiosity Hub',
+                headerBackTitle: 'Back',
+                headerTintColor: theme.primary,
+                headerTitleStyle: {
+                  fontFamily: 'AvenirNext-Medium',
+                  fontSize: 20,
+                  color: theme.primary
+                },
+                headerBackTitleStyle: {
+                  fontFamily: 'AvenirNext-Regular',
+                },
+              }}
+            />
+            <Stack.Screen
+              name="TopicPreferences"
+              component={TopicPreferencesScreen}
+              options={{
+                headerShown: true,
+                headerBackTitle: 'Back',
+                title: '',
+                headerTintColor: theme.primary,
+                headerTitleStyle: {
+                  fontFamily: 'AvenirNext-Medium',
+                },
+              }}
+            />
+            <Stack.Screen
+              name="FactHistory"
+              component={FactHistoryScreen}
+              options={{
+                headerShown: true,
+                headerBackTitle: 'Back',
+                title: '',
+                headerTintColor: theme.primary,
+                headerTitleStyle: {
+                  fontFamily: 'AvenirNext-Medium',
+                },
+              }}
+            />
+            <Stack.Screen
+              name="SparkSearch"
+              component={SparkSearchScreen}
+              options={{
+                headerShown: true,
+                headerBackTitle: 'Back',
+                title: 'Search Sparks',
+                headerTintColor: theme.primary,
+                headerTitleStyle: {
+                  fontFamily: 'AvenirNext-Medium',
+                  fontSize: 20,
+                  color: theme.primary
+                },
+                headerBackTitleStyle: {
+                  fontFamily: 'AvenirNext-Regular',
+                },
+              }}
+            />
+            <Stack.Screen
+              name="AccountSettings"
+              component={AccountSettingsScreen}
+              options={{
+                headerShown: true,
+                title: 'Account',
+                headerBackTitle: 'Back',
+                headerTintColor: theme.primary,
+                headerTitleStyle: {
+                  fontFamily: 'AvenirNext-Medium',
+                  fontSize: 20,
+                  color: theme.primary
+                },
+                headerBackTitleStyle: {
+                  fontFamily: 'AvenirNext-Regular',
+                },
+              }}
+            />
+          </>
+        )}
+      </Stack.Navigator>
+      <AuthStateHandler session={session} />
+    </NavigationContainer>
+  );
+}
+
+function App(): React.JSX.Element {
+  return (
+    <ThemeProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <AppContent />
+      </GestureHandlerRootView>
+    </ThemeProvider>
   );
 }
 

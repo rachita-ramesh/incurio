@@ -11,6 +11,7 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
+import { useTheme } from '../theme/ThemeContext';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const SCREEN_HEIGHT = Dimensions.get('window').height;
@@ -34,6 +35,7 @@ export const SwipeableSpark: React.FC<SwipeableSparkProps> = ({
   onSwipeRight,
   onSwipeUp,
 }) => {
+  const { theme } = useTheme();
   const [modalVisible, setModalVisible] = useState(false);
   const translateX = new Animated.Value(0);
   const translateY = new Animated.Value(0);
@@ -102,8 +104,10 @@ export const SwipeableSpark: React.FC<SwipeableSparkProps> = ({
       >
         <Animated.View 
           style={[
-            styles.card, 
+            styles.card,
             { 
+              backgroundColor: theme.card,
+              borderColor: theme.cardBorder,
               transform: [
                 { translateX },
                 { translateY },
@@ -111,33 +115,39 @@ export const SwipeableSpark: React.FC<SwipeableSparkProps> = ({
             }
           ]}
         >
-          <View style={styles.header}>
-            <Text style={styles.topicLabel}>SPARK OF</Text>
-            <Text style={styles.topic}>{spark.topic.toUpperCase()}</Text>
+          <View style={[styles.header, { 
+            borderBottomColor: theme.cardBorder,
+            backgroundColor: theme.surface
+          }]}>
+            <Text style={[styles.topicLabel, { color: theme.primary }]}>SPARK OF</Text>
+            <Text style={[styles.topic, { color: theme.primary }]}>{spark.topic.toUpperCase()}</Text>
           </View>
           
-          <View style={styles.contentContainer}>
-            <Text style={styles.content}>{spark.content}</Text>
+          <View style={[styles.contentContainer, { backgroundColor: theme.surface }]}>
+            <Text style={[styles.content, { color: theme.text.primary }]}>{spark.content}</Text>
             <TouchableOpacity 
-              style={styles.readMoreButton}
+              style={[styles.readMoreButton, { backgroundColor: theme.primary }]}
               onPress={() => setModalVisible(true)}
             >
               <Text style={styles.readMoreText}>Dive Deeper 🔥</Text>
             </TouchableOpacity>
           </View>
           
-          <View style={styles.instructionsContainer}>
+          <View style={[styles.instructionsContainer, { 
+            borderTopColor: theme.cardBorder,
+            backgroundColor: theme.surface
+          }]}>
             <View style={styles.instructionRow}>
-              <Text style={styles.instructionIcon}>←</Text>
-              <Text style={styles.instructionText}>meh 😒</Text>
+              <Text style={[styles.instructionIcon, { color: theme.primary }]}>←</Text>
+              <Text style={[styles.instructionText, { color: theme.text.primary }]}>meh 😒</Text>
             </View>
             <View style={styles.instructionRow}>
-              <Text style={styles.instructionIcon}>↑</Text>
-              <Text style={styles.instructionText}>woah! 🤯</Text>
+              <Text style={[styles.instructionIcon, { color: theme.primary }]}>↑</Text>
+              <Text style={[styles.instructionText, { color: theme.text.primary }]}>woah! 🤯</Text>
             </View>
             <View style={styles.instructionRow}>
-              <Text style={styles.instructionIcon}>→</Text>
-              <Text style={styles.instructionText}>nice 😎</Text>
+              <Text style={[styles.instructionIcon, { color: theme.primary }]}>→</Text>
+              <Text style={[styles.instructionText, { color: theme.text.primary }]}>nice 😎</Text>
             </View>
           </View>
         </Animated.View>
@@ -149,19 +159,24 @@ export const SwipeableSpark: React.FC<SwipeableSparkProps> = ({
         visible={modalVisible}
         onRequestClose={() => setModalVisible(false)}
       >
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTopic}>EXPLORE THIS {spark.topic.toUpperCase()} SPARK</Text>
+        <SafeAreaView style={[styles.modalContainer, { backgroundColor: 'rgba(0, 0, 0, 0.5)' }]}>
+          <View style={[styles.modalContent, { backgroundColor: theme.background }]}>
+            <View style={[styles.modalHeader, { 
+              borderBottomColor: theme.cardBorder,
+              backgroundColor: theme.surface
+            }]}>
+              <Text style={[styles.modalTopic, { color: theme.primary }]}>
+                EXPLORE THIS {spark.topic.toUpperCase()} SPARK
+              </Text>
               <TouchableOpacity 
                 style={styles.closeButton}
                 onPress={() => setModalVisible(false)}
               >
-                <Text style={styles.closeButtonText}>×</Text>
+                <Text style={[styles.closeButtonText, { color: theme.primary }]}>×</Text>
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.modalScrollView}>
-              <Text style={styles.modalDetails}>{spark.details}</Text>
+              <Text style={[styles.modalDetails, { color: theme.text.primary }]}>{spark.details}</Text>
             </ScrollView>
           </View>
         </SafeAreaView>

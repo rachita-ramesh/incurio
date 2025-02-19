@@ -16,6 +16,7 @@ import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-si
 import { supabase } from '../../api/supabase';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { notificationService } from '../../services/notificationService';
+import { useTheme } from '../../theme/ThemeContext';
 
 type RootStackParamList = {
   Auth: undefined;
@@ -29,6 +30,7 @@ type Props = {
 type AuthMode = 'signin' | 'signup' | 'reset';
 
 export const AuthScreen: React.FC<Props> = ({ navigation }) => {
+  const { theme } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -233,7 +235,7 @@ export const AuthScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
@@ -243,22 +245,29 @@ export const AuthScreen: React.FC<Props> = ({ navigation }) => {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.content}>
-            <Text style={styles.title}>
+            <Text style={[styles.title, { color: theme.text.primary }]}>
               {mode === 'signin' ? 'Welcome Back' : 'Join Incurio'}
             </Text>
 
-            <Text style={styles.subtitle}>
+            <Text style={[styles.subtitle, { color: theme.text.secondary }]}>
               {mode === 'signin' 
                 ? 'Sign in to continue to your account' 
                 : 'Create an account to get started'}
             </Text>
 
             <TouchableOpacity 
-              style={[styles.googleButton, loading && styles.buttonDisabled]}
+              style={[
+                styles.googleButton,
+                { 
+                  backgroundColor: theme.card,
+                  borderColor: theme.cardBorder
+                },
+                loading && styles.buttonDisabled
+              ]}
               onPress={handleGoogleAuth}
               disabled={loading}
             >
-              <Text style={styles.googleButtonText}>
+              <Text style={[styles.googleButtonText, { color: theme.text.primary }]}>
                 {mode === 'signin' 
                   ? 'Sign in with Google'
                   : 'Sign up with Google'}
@@ -266,32 +275,50 @@ export const AuthScreen: React.FC<Props> = ({ navigation }) => {
             </TouchableOpacity>
 
             <View style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>OR</Text>
-              <View style={styles.dividerLine} />
+              <View style={[styles.dividerLine, { backgroundColor: theme.divider }]} />
+              <Text style={[styles.dividerText, { color: theme.text.secondary }]}>OR</Text>
+              <View style={[styles.dividerLine, { backgroundColor: theme.divider }]} />
             </View>
 
             <TextInput
-              style={styles.input}
+              style={[
+                styles.input,
+                { 
+                  backgroundColor: theme.card,
+                  borderColor: theme.cardBorder,
+                  color: theme.text.primary
+                }
+              ]}
               placeholder="Email"
               value={email}
               onChangeText={setEmail}
               autoCapitalize="none"
               keyboardType="email-address"
-              placeholderTextColor="#999"
+              placeholderTextColor={theme.text.secondary}
             />
 
             <TextInput
-              style={styles.input}
+              style={[
+                styles.input,
+                { 
+                  backgroundColor: theme.card,
+                  borderColor: theme.cardBorder,
+                  color: theme.text.primary
+                }
+              ]}
               placeholder="Password"
               value={password}
               onChangeText={setPassword}
               secureTextEntry
-              placeholderTextColor="#999"
+              placeholderTextColor={theme.text.secondary}
             />
 
             <TouchableOpacity 
-              style={[styles.button, loading && styles.buttonDisabled]}
+              style={[
+                styles.button,
+                { backgroundColor: theme.primary },
+                loading && styles.buttonDisabled
+              ]}
               onPress={handleEmailAuth}
               disabled={loading}
             >
@@ -304,16 +331,24 @@ export const AuthScreen: React.FC<Props> = ({ navigation }) => {
             <View style={styles.footer}>
               {mode === 'signin' ? (
                 <>
-                  <Text style={styles.footerLabel}>Don't have an account?</Text>
+                  <Text style={[styles.footerLabel, { color: theme.text.secondary }]}>
+                    Don't have an account?
+                  </Text>
                   <TouchableOpacity onPress={() => setMode('signup')}>
-                    <Text style={styles.footerAction}>Sign up</Text>
+                    <Text style={[styles.footerAction, { color: theme.primary }]}>
+                      Sign up
+                    </Text>
                   </TouchableOpacity>
                 </>
               ) : (
                 <>
-                  <Text style={styles.footerLabel}>Already have an account?</Text>
+                  <Text style={[styles.footerLabel, { color: theme.text.secondary }]}>
+                    Already have an account?
+                  </Text>
                   <TouchableOpacity onPress={() => setMode('signin')}>
-                    <Text style={styles.footerAction}>Sign in</Text>
+                    <Text style={[styles.footerAction, { color: theme.primary }]}>
+                      Sign in
+                    </Text>
                   </TouchableOpacity>
                 </>
               )}
@@ -328,7 +363,6 @@ export const AuthScreen: React.FC<Props> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
   },
   keyboardView: {
     flex: 1,
@@ -348,18 +382,15 @@ const styles = StyleSheet.create({
     fontFamily: 'AvenirNext-Bold',
     fontWeight: 'bold',
     marginBottom: 12,
-    color: '#000',
     textAlign: 'center',
   },
   subtitle: {
     fontSize: 16,
     fontFamily: 'AvenirNext-Regular',
-    color: '#666',
     marginBottom: 32,
     textAlign: 'center',
   },
   googleButton: {
-    backgroundColor: '#fff',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -369,10 +400,8 @@ const styles = StyleSheet.create({
     width: '100%',
     marginBottom: 24,
     borderWidth: 1,
-    borderColor: '#ddd',
   },
   googleButtonText: {
-    color: '#000',
     fontSize: 16,
     fontFamily: 'AvenirNext-Medium',
     fontWeight: '600',
@@ -386,11 +415,9 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#ddd',
   },
   dividerText: {
     marginHorizontal: 12,
-    color: '#666',
     fontSize: 14,
     fontFamily: 'AvenirNext-Regular',
   },
@@ -398,17 +425,13 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 48,
     borderWidth: 1,
-    borderColor: '#ddd',
     borderRadius: 8,
     paddingHorizontal: 16,
     marginBottom: 16,
     fontSize: 16,
-    color: '#000',
-    backgroundColor: '#fff',
     fontFamily: 'AvenirNext-Regular',
   },
   button: {
-    backgroundColor: '#6B4EFF',
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 8,
@@ -425,7 +448,7 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   buttonDisabled: {
-    backgroundColor: '#ccc',
+    opacity: 0.7,
     shadowOpacity: 0,
   },
   buttonText: {
@@ -440,12 +463,10 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   footerLabel: {
-    color: '#666',
     fontSize: 14,
     fontFamily: 'AvenirNext-Regular',
   },
   footerAction: {
-    color: '#6B4EFF',
     fontSize: 14,
     fontFamily: 'AvenirNext-Medium',
     fontWeight: '600',
