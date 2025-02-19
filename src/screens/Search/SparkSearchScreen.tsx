@@ -14,6 +14,7 @@ import { supabase } from '../../api/supabase';
 import { SparkDetailModal } from '../../components/SparkDetailModal';
 import { useDebounce } from '../../hooks/useDebounce';
 import { useTheme } from '../../theme/ThemeContext';
+import { useNavigation } from '@react-navigation/native';
 
 const RECENT_SEARCHES_KEY = 'recent_searches';
 const MAX_RECENT_SEARCHES = 3;
@@ -36,6 +37,14 @@ export const SparkSearchScreen = () => {
   const [selectedSpark, setSelectedSpark] = useState<Spark | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const debouncedSearch = useDebounce(searchQuery, 300);
+  const navigation = useNavigation();
+
+  useEffect(() => {
+    navigation.setOptions({
+      headerTitle: '',
+      headerTintColor: '#6B4EFF',
+    });
+  }, []);
 
   useEffect(() => {
     // Clear existing searches and start fresh

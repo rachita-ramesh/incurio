@@ -135,41 +135,31 @@ export const FactHistoryScreen: React.FC<Props> = ({ route, navigation }) => {
           {sparks.length} {sparks.length === 1 ? 'spark' : 'sparks'}
         </Text>
       </View>
-      {sparks.length === 0 ? (
-        <View style={[styles.emptyContainer, { backgroundColor: theme.background }]}>
-          <Text style={[styles.emptyText, { color: theme.text.secondary }]}>
-            No {route.params.filter === 'like' ? 'nice 😎' :
-                route.params.filter === 'love' ? 'woah 🤯' :
-                'meh 😒'} sparks yet
-          </Text>
-        </View>
-      ) : (
-        <FlatList
-          data={sparks}
-          renderItem={({ item }) => (
-            <TouchableOpacity 
-              style={[
-                styles.sparkCard,
-                { 
-                  backgroundColor: theme.card,
-                  borderColor: theme.cardBorder
-                }
-              ]}
-              onPress={() => handleSparkSelect(item)}
-            >
-              <View style={styles.sparkHeader}>
-                <Text style={styles.sparkTopic}>{item.topic}</Text>
-              </View>
-              <Text style={[styles.sparkContent, { color: theme.text.primary }]}>{item.content}</Text>
-              <Text style={[styles.sparkDate, { color: theme.text.secondary }]}>
-                {new Date(item.created_at).toLocaleDateString()}
-              </Text>
-            </TouchableOpacity>
-          )}
-          keyExtractor={item => item.id}
-          contentContainerStyle={[styles.listContainer, { padding: 20 }]}
-        />
-      )}
+      <FlatList
+        data={sparks}
+        renderItem={({ item }) => (
+          <TouchableOpacity 
+            style={[
+              styles.sparkCard,
+              { 
+                backgroundColor: theme.card,
+                borderColor: theme.cardBorder
+              }
+            ]}
+            onPress={() => handleSparkSelect(item)}
+          >
+            <View style={styles.sparkHeader}>
+              <Text style={styles.sparkTopic}>{item.topic}</Text>
+            </View>
+            <Text style={[styles.sparkContent, { color: theme.text.primary }]}>{item.content}</Text>
+            <Text style={[styles.sparkDate, { color: theme.text.secondary }]}>
+              {new Date(item.created_at).toLocaleDateString()}
+            </Text>
+          </TouchableOpacity>
+        )}
+        keyExtractor={item => item.id}
+        contentContainerStyle={[styles.listContainer, { padding: 20 }]}
+      />
 
       <SparkDetailModal
         spark={selectedSpark ? {

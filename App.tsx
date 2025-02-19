@@ -6,9 +6,9 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { View, ActivityIndicator, Linking } from 'react-native';
-import { NavigationContainer, DefaultTheme, DarkTheme, useNavigation } from '@react-navigation/native';
+import { GestureHandlerRootView, TouchableOpacity } from 'react-native-gesture-handler';
+import { View, ActivityIndicator, Linking, Text } from 'react-native';
+import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator, NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { supabase } from './src/api/supabase';
@@ -195,16 +195,25 @@ function AppContent(): React.JSX.Element {
           name="Fact" 
           component={FactScreen}
           initialParams={{ selectedTopics: userPreferences }}
-          options={{ 
+          options={({ navigation }) => ({ 
             headerShown: true,
             title: 'Daily Spark',
-            headerBackTitle: 'Back',
+            headerBackVisible: false,
+            headerLeft: () => null,
+            headerRight: () => (
+              <TouchableOpacity 
+                onPress={() => navigation.navigate('CuriosityHub')}
+                style={{ marginRight: 8 }}
+              >
+                <Text style={{ fontSize: 24 }}>🧠</Text>
+              </TouchableOpacity>
+            ),
             headerTintColor: theme.primary,
             headerTitleStyle: {
               fontFamily: 'AvenirNext-Medium',
               color: theme.primary
             },
-          }}
+          })}
         />
         <Stack.Screen
           name="CuriosityHub"
@@ -256,15 +265,10 @@ function AppContent(): React.JSX.Element {
           options={{
             headerShown: true,
             headerBackTitle: 'Back',
-            title: 'Search Sparks',
+            title: '',
             headerTintColor: theme.primary,
             headerTitleStyle: {
               fontFamily: 'AvenirNext-Medium',
-              fontSize: 20,
-              color: theme.primary
-            },
-            headerBackTitleStyle: {
-              fontFamily: 'AvenirNext-Regular',
             },
           }}
         />
