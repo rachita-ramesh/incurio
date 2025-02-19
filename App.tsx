@@ -21,6 +21,8 @@ import { notificationService } from './src/services/notificationService';
 import { Session } from '@supabase/supabase-js';
 import { TopicPreferencesScreen } from './src/screens/Account/TopicPreferencesScreen';
 import { FactHistoryScreen } from './src/screens/Account/FactHistoryScreen';
+import { AccountSettingsScreen } from './src/screens/Account/AccountSettingsScreen';
+import { CuriosityHubScreen } from './src/screens/Account/CuriosityHubScreen';
 
 export type RootStackParamList = {
   Auth: undefined;
@@ -32,6 +34,7 @@ export type RootStackParamList = {
   TopicPreferences: undefined;
   FactHistory: { filter: 'like' | 'love' | 'dislike' };
   SparkSearch: undefined;
+  AccountSettings: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -208,7 +211,7 @@ function App(): React.JSX.Element {
               />
               <Stack.Screen
                 name="CuriosityHub"
-                component={AccountScreen}
+                component={CuriosityHubScreen}
                 options={{
                   headerShown: true,
                   title: 'Curiosity Hub',
@@ -260,6 +263,24 @@ function App(): React.JSX.Element {
                   headerTintColor: '#6B4EFF',
                   headerTitleStyle: {
                     fontFamily: 'AvenirNext-Medium',
+                  },
+                  headerBackTitleStyle: {
+                    fontFamily: 'AvenirNext-Regular',
+                  },
+                }}
+              />
+              <Stack.Screen
+                name="AccountSettings"
+                component={AccountSettingsScreen}
+                options={{
+                  headerShown: true,
+                  title: 'Account',
+                  headerBackTitle: 'Back',
+                  headerTintColor: '#6B4EFF',
+                  headerTitleStyle: {
+                    fontFamily: 'AvenirNext-Medium',
+                    fontSize: 20,
+                    color: '#6B4EFF'
                   },
                   headerBackTitleStyle: {
                     fontFamily: 'AvenirNext-Regular',

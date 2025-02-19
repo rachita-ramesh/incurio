@@ -12,9 +12,11 @@ import { TopicSelector } from '../../components/TopicSelector';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 type RootStackParamList = {
-  Account: undefined;
-  TopicPreferences: undefined;
+  Auth: undefined;
+  Topic: undefined;
   Fact: { selectedTopics: string[] };
+  TopicPreferences: undefined;
+  AccountSettings: undefined;
 };
 
 type Props = {
@@ -61,8 +63,16 @@ export const TopicPreferencesScreen: React.FC<Props> = ({ navigation }) => {
       if (!user) return;
 
       await supabaseApi.saveUserPreferences(user.id, selectedTopics);
-      Alert.alert('Success', 'Your preferences have been updated!');
-      navigation.navigate('Fact', { selectedTopics });
+      Alert.alert(
+        'Success',
+        'Your preferences have been updated! Changes will take effect with your next daily spark.',
+        [
+          {
+            text: 'OK',
+            onPress: () => navigation.goBack()
+          }
+        ]
+      );
     } catch (error) {
       console.error('Error saving preferences:', error);
       Alert.alert('Error', 'Failed to save your preferences. Please try again.');
@@ -75,7 +85,7 @@ export const TopicPreferencesScreen: React.FC<Props> = ({ navigation }) => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4285F4" />
+          <ActivityIndicator size="large" color="#6B4EFF" />
           <Text style={styles.loadingText}>Loading your preferences...</Text>
         </View>
       </SafeAreaView>
