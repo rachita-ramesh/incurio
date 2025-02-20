@@ -1,6 +1,7 @@
 import PushNotification, { Importance } from 'react-native-push-notification';
 import PushNotificationIOS, { PushNotificationPermissions } from '@react-native-community/push-notification-ios';
 import { SPARK_TIME } from './factGenerator';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 class NotificationService {
   constructor() {
@@ -23,7 +24,7 @@ class NotificationService {
         sound: true,
       },
       popInitialNotification: true,
-      requestPermissions: true,
+      requestPermissions: false, // Don't automatically request permissions
     });
 
     // Create the notification channel (Android only)
@@ -39,6 +40,29 @@ class NotificationService {
       },
       (created) => console.log(`Channel created: ${created}`)
     );
+
+    // Check if we need to request permissions
+    this.checkAndRequestPermissions();
+  };
+
+  checkAndRequestPermissions = async () => {
+    try {
+      const permissionStatus = await AsyncStorage.getItem('notification_permission_status');
+      
+      // Only request if we haven't asked before
+      if (!permissionStatus) {
+        console.log('Requesting notification permissions for the first time');
+        const permissions = await PushNotification.requestPermissions();
+        
+        // Store the result
+        await AsyncStorage.setItem('notification_permission_status', 'requested');
+        console.log('Permission request result:', permissions);
+      } else {
+        console.log('Notification permissions were previously handled');
+      }
+    } catch (error) {
+      console.error('Error handling notification permissions:', error);
+    }
   };
 
   scheduleDailyNotification = () => {
