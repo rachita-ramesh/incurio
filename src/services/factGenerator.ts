@@ -8,6 +8,9 @@ export const DAILY_SPARK_KEY = 'daily_spark';
 export const SPARK_INTERACTION_KEY = 'spark_interaction';
 const VARIETY_PROBABILITY = 0.2; // 20% chance to show spark from non-preferred topics
 
+// Simple time constant - 9:00 AM
+export const SPARK_TIME = 9; // 9 hours (9:00 AM)
+
 interface DailySpark {
   id: string;
   content: string;
@@ -56,8 +59,6 @@ export const sparkGeneratorService = {
       throw new Error('Failed to save spark');
     }
 
-    console.log('Saved spark to Supabase with ID:', savedSpark[0].id);
-
     const spark: DailySpark = {
       id: savedSpark[0].id,
       content: generatedSpark.content,
@@ -70,37 +71,67 @@ export const sparkGeneratorService = {
 
     // Save to local storage with user-specific key
     await AsyncStorage.setItem(userSparkKey, JSON.stringify(spark));
-    console.log('Saved spark to local storage with ID:', spark.id);
+    
+    // Schedule next day's notification
+    notificationService.scheduleDailyNotification();
 
     return spark;
   },
 
   async getTodaysSpark(userId: string, selectedTopics: string[], userPreferences: string) {
-    const today = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
     const userSparkKey = `${DAILY_SPARK_KEY}_${userId}`;
+    
+    // Production logging
+    console.log('=== Spark Generation Debug ===');
+    console.log('Current time (local):', now.toLocaleString());
+    console.log('Current time (ISO):', now.toISOString());
+    console.log('Today\'s date:', today);
+    console.log('Current decimal hours:', now.getHours() + (now.getMinutes() / 60));
+    console.log('Target spark time:', SPARK_TIME);
+    console.log('User ID:', userId);
+    console.log('Selected topics:', selectedTopics);
     
     // Check if we already have today's spark for this user
     const storedSpark = await AsyncStorage.getItem(userSparkKey);
     if (storedSpark) {
+      console.log('Found stored spark');
       const parsedSpark: DailySpark = JSON.parse(storedSpark);
-      if (parsedSpark.date === today && parsedSpark.id) {
-        console.log('Returning cached spark for today with ID:', parsedSpark.id);
+      console.log('Stored spark date:', parsedSpark.date);
+      console.log('Today\'s date:', today);
+      if (parsedSpark.date === today) {
+        console.log('Returning today\'s stored spark');
         return parsedSpark;
       }
-      // If spark is from a previous day or has no ID, remove it
-      console.log('Removing old or invalid spark from cache');
+      console.log('Stored spark is old, removing');
       await AsyncStorage.removeItem(userSparkKey);
+    } else {
+      console.log('No stored spark found');
     }
 
-    // Generate new spark if it's past 8 AM
-    const now = new Date();
-    const eightAM = new Date(now);
-    eightAM.setHours(8, 0, 0, 0);
+    // Convert current time to decimal hours for comparison
+    const currentTimeInHours = now.getHours() + (now.getMinutes() / 60);
+    console.log('Time comparison:', {
+      current: currentTimeInHours.toFixed(3),
+      target: SPARK_TIME.toFixed(3),
+      shouldGenerate: currentTimeInHours >= SPARK_TIME
+    });
 
-    if (now >= eightAM) {
-      return this.generateDailySpark(userId, selectedTopics, userPreferences);
+    // Check if it's past spark time
+    if (currentTimeInHours >= SPARK_TIME) {
+      console.log('Past spark time, initiating generation');
+      try {
+        const spark = await this.generateDailySpark(userId, selectedTopics, userPreferences);
+        console.log('Successfully generated new spark:', spark.id);
+        return spark;
+      } catch (error) {
+        console.error('Error generating spark:', error);
+        throw error;
+      }
     } else {
-      console.log('Too early for today\'s spark. Please wait until 8 AM.');
+      console.log('Too early for spark, waiting until:', 
+        `${Math.floor(SPARK_TIME)}:${Math.round((SPARK_TIME % 1) * 60).toString().padStart(2, '0')}`);
       return null;
     }
   },
@@ -149,9 +180,9 @@ export const sparkGeneratorService = {
 
   async shouldGenerateNewSpark(): Promise<boolean> {
     const now = new Date();
-    const eightAM = new Date(now);
-    eightAM.setHours(8, 0, 0, 0);
+    const nineAM = new Date(now);
+    nineAM.setHours(9, 0, 0, 0);
     
-    return now >= eightAM;
+    return now >= nineAM;
   }
 };

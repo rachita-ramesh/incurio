@@ -1,10 +1,6 @@
 import PushNotification, { Importance } from 'react-native-push-notification';
 import PushNotificationIOS, { PushNotificationPermissions } from '@react-native-community/push-notification-ios';
-
-interface NotificationToken {
-  token: string;
-  os: string;
-}
+import { SPARK_TIME } from './factGenerator';
 
 class NotificationService {
   constructor() {
@@ -14,10 +10,10 @@ class NotificationService {
   configure = () => {
     // Configure the notification channel
     PushNotification.configure({
-      onRegister: function (token: NotificationToken) {
+      onRegister: function (token) {
         console.log('TOKEN:', token);
       },
-      onNotification: function (notification: any) {
+      onNotification: function (notification) {
         console.log('NOTIFICATION:', notification);
         notification.finish(PushNotificationIOS.FetchResult.NoData);
       },
@@ -33,45 +29,70 @@ class NotificationService {
     // Create the notification channel (Android only)
     PushNotification.createChannel(
       {
-        channelId: 'daily-facts',
-        channelName: 'Daily Facts',
-        channelDescription: 'Daily notification for new facts',
+        channelId: 'daily-sparks',
+        channelName: 'Daily Sparks',
+        channelDescription: 'Daily notification for your morning spark',
         playSound: true,
         soundName: 'default',
         importance: Importance.HIGH,
         vibrate: true,
       },
-      (created: boolean) => console.log(`Channel 'daily-facts' created: ${created}`)
+      (created) => console.log(`Channel created: ${created}`)
     );
   };
 
   scheduleDailyNotification = () => {
+    console.log('=== Notification Scheduling Debug ===');
+    
     // Cancel any existing notifications
     PushNotification.cancelAllLocalNotifications();
+    console.log('Cancelled existing notifications');
 
-    // Schedule reminder notification for 9 AM if user hasn't interacted
+    const nextDate = this.getNextNotificationDate();
+    console.log('Next notification details:', {
+      date: nextDate.toLocaleString(),
+      isoString: nextDate.toISOString(),
+      hours: nextDate.getHours(),
+      minutes: nextDate.getMinutes(),
+      timestamp: nextDate.getTime()
+    });
+
+    // Schedule next notification
     PushNotification.localNotificationSchedule({
-      channelId: 'daily-facts',
-      title: "🧠 Don't Miss Today's Spark!",
-      message: "Your daily spark is waiting to ignite your curiosity!",
-      date: this.getNextNotificationDate(),
+      channelId: 'daily-sparks',
+      title: "🧠 Your Daily Spark",
+      message: "Start your day with curiosity!",
+      date: nextDate,
       repeatType: 'day',
       allowWhileIdle: true,
       importance: 'high',
       playSound: true,
       soundName: 'default',
     });
+    
+    console.log('Notification scheduled successfully');
   };
 
   getNextNotificationDate = () => {
     const now = new Date();
     const nextNotification = new Date();
     
-    // Set notification time to 9 AM
-    nextNotification.setHours(9, 0, 0, 0);
+    // Set to 3 minutes after spark time (9:03 AM)
+    const hours = Math.floor(SPARK_TIME);
+    const minutes = Math.round((SPARK_TIME - hours) * 60) + 3; // Add 3 minutes
+    nextNotification.setHours(hours, minutes, 0, 0);
     
-    // If it's already past 9 AM, schedule for tomorrow
-    if (now.getHours() >= 9) {
+    console.log('Notification time calculation:', {
+      sparkTime: SPARK_TIME,
+      hours,
+      minutes,
+      currentTime: now.toLocaleString(),
+      scheduledTime: nextNotification.toLocaleString()
+    });
+    
+    // If it's already past notification time, schedule for tomorrow
+    if (now > nextNotification) {
+      console.log('Past notification time, scheduling for tomorrow');
       nextNotification.setDate(nextNotification.getDate() + 1);
     }
     
@@ -85,7 +106,6 @@ class NotificationService {
   requestPermissions = async (): Promise<PushNotificationPermissions | null> => {
     try {
       const permissions = await PushNotification.requestPermissions();
-      console.log('Notification permissions:', permissions);
       return permissions;
     } catch (error) {
       console.error('Error requesting notification permissions:', error);

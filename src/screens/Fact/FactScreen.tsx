@@ -8,8 +8,7 @@ import {
   SafeAreaView,
   Alert,
 } from 'react-native';
-import { sparkGeneratorService } from '../../services/factGenerator';
-import { DAILY_SPARK_KEY } from '../../services/factGenerator';
+import { sparkGeneratorService, DAILY_SPARK_KEY, SPARK_TIME } from '../../services/factGenerator';
 import { supabase } from '../../api/supabase';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { SwipeableSpark } from '../../components/SwipeableFact';
@@ -69,9 +68,21 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
   }, [navigation]);
 
   const loadSpark = async () => {
+    let timeoutId: NodeJS.Timeout | undefined;
+    
     try {
       setLoading(true);
       setError(null);
+      
+      // Create an AbortController for the API request
+      const abortController = new AbortController();
+      
+      // Add timeout
+      timeoutId = setTimeout(() => {
+        abortController.abort();
+        setError('Taking too long to generate spark. Please try again.');
+        setLoading(false);
+      }, 30000); // 30 second timeout
       
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
@@ -79,6 +90,7 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
       // Check if user has already consumed today's spark
       const hasConsumed = await sparkGeneratorService.checkIfSparkAvailableToday(user.id);
       if (hasConsumed) {
+        clearTimeout(timeoutId);
         setSparkConsumed(true);
         return;
       }
@@ -95,6 +107,7 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
             topic: parsedSpark.topic,
             details: parsedSpark.details
           });
+          clearTimeout(timeoutId);
           setLoading(false);
           return;
         }
@@ -106,8 +119,10 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
         'Prefer concise, interesting sparks that are easy to understand and ignite curiosity.'
       );
       
+      clearTimeout(timeoutId);
+      
       if (!dailySpark) {
-        throw new Error('No spark available yet. Please wait until 8 AM.');
+        throw new Error(`Too early for today's spark. Please wait until 9:00 AM.`);
       }
       
       if (!dailySpark.content || !dailySpark.id) {
@@ -123,8 +138,13 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
       });
     } catch (err) {
       console.error('Error loading spark:', err);
-      setError('Failed to load today\'s spark. Please try again later.');
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Failed to load today\'s spark. Please try again later.');
+      }
     } finally {
+      if (timeoutId) clearTimeout(timeoutId);
       setLoading(false);
     }
   };
@@ -235,7 +255,7 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.primary} />
           <Text style={[styles.loadingText, { color: theme.text.secondary }]}>
-            Generating your daily spark...
+            Loading your spark...
           </Text>
         </View>
       </SafeAreaView>
@@ -243,15 +263,26 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
   }
 
   if (error) {
+    const now = new Date();
+    const hours = Math.floor(SPARK_TIME);
+    const minutes = Math.round((SPARK_TIME - hours) * 60);
+    const timeString = `${hours % 12 || 12}:${minutes.toString().padStart(2, '0')} ${hours >= 12 ? 'PM' : 'AM'}`;
+    
+    const errorMessage = now.getHours() < SPARK_TIME
+      ? `Today's spark will be ready at ${timeString}`
+      : error;
+
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
         <View style={styles.errorContainer}>
           <Text style={[styles.errorText, { color: theme.text.primary }]}>
-            {error}
+            {errorMessage}
           </Text>
-          <TouchableOpacity style={styles.retryButton} onPress={loadSpark}>
-            <Text style={styles.retryButtonText}>Try Again</Text>
-          </TouchableOpacity>
+          {now.getHours() >= SPARK_TIME && (
+            <TouchableOpacity style={styles.retryButton} onPress={loadSpark}>
+              <Text style={styles.retryButtonText}>Try Again</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </SafeAreaView>
     );

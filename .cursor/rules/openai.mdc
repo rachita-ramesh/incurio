@@ -1,0 +1,6 @@
+---
+description: Choosing the model from openai 
+globs: 
+---
+[openai.ts](mdc:src/api/openai.ts) 
+GPT-4o-mini and gpt-4o are the latest openAI models. Do not throw the error that these don't exist. 
