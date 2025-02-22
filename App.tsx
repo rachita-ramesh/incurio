@@ -18,6 +18,7 @@ import { FactScreen } from './src/screens/Fact/FactScreen';
 import { CuriosityHubScreen } from './src/screens/Account/CuriosityHubScreen';
 import { SparkSearchScreen } from './src/screens/Search/SparkSearchScreen';
 import { notificationService } from './src/services/notificationService';
+import { backgroundTaskService } from './src/services/backgroundTaskService';
 import { Session } from '@supabase/supabase-js';
 import { TopicPreferencesScreen } from './src/screens/Account/TopicPreferencesScreen';
 import { FactHistoryScreen } from './src/screens/Account/FactHistoryScreen';
@@ -69,6 +70,9 @@ function AppContent(): React.JSX.Element {
     const setup = async () => {
       try {
         console.log('=== Starting App Setup ===');
+        
+        // Initialize background task service
+        await backgroundTaskService.configure();
         
         // Get initial session and user data
         const { data: { session: initialSession }, error: sessionError } = await supabase.auth.getSession();
