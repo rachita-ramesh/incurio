@@ -8,8 +8,8 @@ export const DAILY_SPARK_KEY = 'daily_spark';
 export const SPARK_INTERACTION_KEY = 'spark_interaction';
 const VARIETY_PROBABILITY = 0.2; // 20% chance to show spark from non-preferred topics
 
-// Simple time constant - 9:35 PM (local)
-export const SPARK_TIME = 22.583; // 21 hours + 35 minutes (9:35 PM)
+// Simple time constant - 9:00 AM (local)
+export const SPARK_TIME = 9.0; // 9 hours (9:00 AM)
 
 interface DailySpark {
   id: string;
