@@ -23,6 +23,7 @@ interface SwipeableSparkProps {
     content: string;
     topic: string;
     details: string;
+    sparkIndex: number;  // Index of current spark (1-5)
   };
   onSwipeLeft: () => void;   // Skip
   onSwipeRight: () => void;  // Like
@@ -119,8 +120,12 @@ export const SwipeableSpark: React.FC<SwipeableSparkProps> = ({
             borderBottomColor: theme.cardBorder,
             backgroundColor: theme.surface
           }]}>
-            <Text style={[styles.topicLabel, { color: theme.primary }]}>SPARK OF</Text>
-            <Text style={[styles.topic, { color: theme.primary }]}>{spark.topic.toUpperCase()}</Text>
+            <View style={styles.headerContent}>
+              <View style={styles.topicContainer}>
+                <Text style={[styles.topicLabel, { color: theme.primary }]}>SPARK OF</Text>
+                <Text style={[styles.topic, { color: theme.primary }]}>{spark.topic.toUpperCase()}</Text>
+              </View>
+            </View>
           </View>
           
           <View style={[styles.contentContainer, { backgroundColor: theme.surface }]}>
@@ -212,6 +217,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8F5FF',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+  },
+  topicContainer: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
   },
   topicLabel: {
     fontSize: 16,

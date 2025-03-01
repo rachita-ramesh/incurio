@@ -3,6 +3,12 @@ import PushNotificationIOS, { PushNotificationPermissions } from '@react-native-
 import { SPARK_TIME } from './factGenerator';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+// Define notification time constant
+const NOTIFICATION_TIME = {
+  HOURS: 9,
+  MINUTES: 30
+};
+
 class NotificationService {
   constructor() {
     this.configure();
@@ -101,15 +107,12 @@ class NotificationService {
     const now = new Date();
     const nextNotification = new Date();
     
-    // Set to 3 minutes after spark time (9:03 AM)
-    const hours = Math.floor(SPARK_TIME);
-    const minutes = Math.round((SPARK_TIME - hours) * 60) + 3; // Add 3 minutes
-    nextNotification.setHours(hours, minutes, 0, 0);
+    // Set to 9:30 AM
+    nextNotification.setHours(NOTIFICATION_TIME.HOURS, NOTIFICATION_TIME.MINUTES, 0, 0);
     
     console.log('Notification time calculation:', {
-      sparkTime: SPARK_TIME,
-      hours,
-      minutes,
+      hours: NOTIFICATION_TIME.HOURS,
+      minutes: NOTIFICATION_TIME.MINUTES,
       currentTime: now.toLocaleString(),
       scheduledTime: nextNotification.toLocaleString()
     });

@@ -34,6 +34,7 @@ interface Spark {
   content: string;
   topic: string;
   details: string;
+  sparkIndex: number;
 }
 
 export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
@@ -105,7 +106,8 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
             id: parsedSpark.id,
             content: parsedSpark.content,
             topic: parsedSpark.topic,
-            details: parsedSpark.details
+            details: parsedSpark.details,
+            sparkIndex: parsedSpark.sparkIndex
           });
           clearTimeout(timeoutId);
           setLoading(false);
@@ -134,7 +136,8 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
         id: dailySpark.id,
         content: dailySpark.content,
         topic: dailySpark.topic,
-        details: dailySpark.details
+        details: dailySpark.details,
+        sparkIndex: dailySpark.sparkIndex
       });
     } catch (err) {
       console.error('Error loading spark:', err);
@@ -161,22 +164,51 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
+      if (!spark) throw new Error('No spark available');
 
-      await sparkGeneratorService.markSparkAsInteracted(user.id);
-      notificationService.scheduleDailyNotification();
-      setSparkConsumed(true);
+      // Mark current spark as interacted
+      await sparkGeneratorService.markSparkAsInteracted(user.id, spark.sparkIndex);
+
+      // Try to get the next uninteracted spark
+      const nextSpark = await sparkGeneratorService.getTodaysSpark(
+        user.id,
+        route.params.selectedTopics,
+        'Prefer concise, interesting sparks that are easy to understand and ignite curiosity.'
+      );
+
+      if (nextSpark) {
+        // If there's another spark, show it
+        setSpark(nextSpark);
+      } else {
+        // If no more sparks, show the consumed screen
+        notificationService.scheduleDailyNotification();
+        setSparkConsumed(true);
+      }
     } catch (error) {
       console.error('Error handling interaction:', error);
+      // Check if all sparks have been consumed
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const hasConsumed = await sparkGeneratorService.checkIfSparkAvailableToday(user.id);
+          if (hasConsumed) {
+            notificationService.scheduleDailyNotification();
+            setSparkConsumed(true);
+            return;
+          }
+        }
+      } catch (checkError) {
+        console.error('Error checking spark status:', checkError);
+      }
       setError('Failed to process your response. Please try again.');
     }
   };
 
   const handleSwipeUp = async () => {
     try {
-      if (!spark) return;
-      
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
+      if (!spark) throw new Error('No spark available');
 
       // Save the love interaction
       const { error: interactionError } = await supabase
@@ -199,10 +231,9 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
 
   const handleSwipeLeft = async () => {
     try {
-      if (!spark) return;
-      
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
+      if (!spark) throw new Error('No spark available');
 
       // Save the dislike interaction
       const { error: interactionError } = await supabase
@@ -225,10 +256,9 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
 
   const handleSwipeRight = async () => {
     try {
-      if (!spark) return;
-      
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
+      if (!spark) throw new Error('No spark available');
 
       // Save the like interaction
       const { error: interactionError } = await supabase
