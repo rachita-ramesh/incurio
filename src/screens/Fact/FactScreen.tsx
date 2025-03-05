@@ -87,16 +87,29 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
       setLoading(true);
       setError(null);
 
+      const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         setError('User not authenticated');
         setLoading(false);
         return;
       }
 
-      // Check if sparks are available for today or if all consumed
-      const sparkAvailable = await sparkGeneratorService.checkIfSparkAvailableToday(user.id);
-      
-      if (!sparkAvailable) {
+      // Get user preferences from database
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('preferences')
+        .eq('id', user.id)
+        .single();
+
+      if (userError) {
+        console.error('Error fetching user preferences:', userError);
+      }
+
+      const userPreferences = userData?.preferences || [];
+
+      // Check if all sparks have been consumed
+      const hasAvailableSpark = await sparkGeneratorService.checkIfSparkAvailableToday(user.id);
+      if (!hasAvailableSpark) {
         console.log('All sparks consumed for today');
         setSparkConsumed(true);
         setLoading(false);
@@ -107,7 +120,7 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
       const loadedSpark = await sparkGeneratorService.getTodaysSpark(
         user.id,
         selectedTopics,
-        JSON.stringify(user.preferences || [])
+        JSON.stringify(userPreferences)
       );
 
       if (loadedSpark) {
@@ -144,6 +157,19 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
       if (!user) throw new Error('User not authenticated');
       if (!spark) throw new Error('No spark available');
 
+      // Get user preferences from database
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('preferences')
+        .eq('id', user.id)
+        .single();
+
+      if (userError) {
+        console.error('Error fetching user preferences:', userError);
+      }
+
+      const userPreferences = userData?.preferences || [];
+
       // Mark current spark as interacted
       await sparkGeneratorService.markSparkAsInteracted(user.id, spark.sparkIndex);
 
@@ -151,7 +177,7 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
       const nextSpark = await sparkGeneratorService.getTodaysSpark(
         user.id,
         selectedTopics,
-        JSON.stringify(user.preferences || [])
+        JSON.stringify(userPreferences)
       );
 
       if (nextSpark) {

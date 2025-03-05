@@ -9,8 +9,8 @@ export const SPARK_INTERACTION_KEY = 'spark_interaction';
 export const TOTAL_DAILY_SPARKS = 7;
 const VARIETY_PROBABILITY = 0.2; // 20% chance to show spark from non-preferred topics
 
-// Set spark generation time to 7:00 PM for testing
-export const SPARK_TIME = 19.0; // 7:00 PM
+// Set spark generation time to 9:00 AM for testing
+export const SPARK_TIME = 9.0; // 9:00 AM
 
 interface DailySpark {
   id: string;

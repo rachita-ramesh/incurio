@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,9 @@ import {
   FlatList,
   SafeAreaView,
   ActivityIndicator,
+  ScrollView,
+  Animated,
+  Image,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../../api/supabase';
@@ -36,8 +39,12 @@ export const SparkSearchScreen = () => {
   const [loading, setLoading] = useState(false);
   const [selectedSpark, setSelectedSpark] = useState<Spark | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
+  const [isFocused, setIsFocused] = useState(false);
+  const underlineAnim = useRef(new Animated.Value(0)).current;
   const debouncedSearch = useDebounce(searchQuery, 300);
   const navigation = useNavigation();
+  const [userTopics, setUserTopics] = useState<string[]>([]);
 
   useEffect(() => {
     navigation.setOptions({
@@ -47,11 +54,37 @@ export const SparkSearchScreen = () => {
   }, []);
 
   useEffect(() => {
-    // Clear existing searches and start fresh
     clearRecentSearches().then(() => {
       loadRecentSearches();
     });
+    
+    fetchUserTopics();
   }, []);
+
+  const fetchUserTopics = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('sparks')
+        .select(`
+          topic,
+          user_interactions!inner (user_id)
+        `)
+        .eq('user_interactions.user_id', user.id);
+
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
+        const topicsSet = new Set(data.map((item: { topic: string }) => item.topic));
+        const uniqueTopics = Array.from(topicsSet).sort();
+        setUserTopics(uniqueTopics);
+      }
+    } catch (error) {
+      console.error('Error fetching user topics:', error);
+    }
+  };
 
   useEffect(() => {
     if (debouncedSearch) {
@@ -61,15 +94,21 @@ export const SparkSearchScreen = () => {
     }
   }, [debouncedSearch]);
 
+  useEffect(() => {
+    Animated.timing(underlineAnim, {
+      toValue: isFocused || searchQuery.length > 0 ? 1 : 0,
+      duration: 200,
+      useNativeDriver: false,
+    }).start();
+  }, [isFocused, searchQuery]);
+
   const loadRecentSearches = async () => {
     try {
       const searches = await AsyncStorage.getItem(RECENT_SEARCHES_KEY);
       if (searches) {
         const parsedSearches = JSON.parse(searches);
-        // Ensure only MAX_RECENT_SEARCHES are loaded
         const limitedSearches = parsedSearches.slice(0, MAX_RECENT_SEARCHES);
         setRecentSearches(limitedSearches);
-        // Update storage if we had to limit the searches
         if (limitedSearches.length < parsedSearches.length) {
           await AsyncStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(limitedSearches));
         }
@@ -105,7 +144,7 @@ export const SparkSearchScreen = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('sparks')
         .select(`
           id,
@@ -115,12 +154,20 @@ export const SparkSearchScreen = () => {
           created_at,
           user_interactions!inner (interaction_type)
         `)
-        .eq('user_interactions.user_id', user.id)
-        .textSearch('content', debouncedSearch, {
+        .eq('user_interactions.user_id', user.id);
+      
+      if (selectedTopic && selectedTopic !== 'All') {
+        query = query.eq('topic', selectedTopic);
+      }
+      
+      if (debouncedSearch) {
+        query = query.textSearch('content', debouncedSearch, {
           type: 'websearch',
           config: 'english'
-        })
-        .order('created_at', { ascending: false });
+        });
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) throw error;
       setResults(data || []);
@@ -130,6 +177,14 @@ export const SparkSearchScreen = () => {
       setLoading(false);
     }
   };
+
+  const handleTopicSelect = (topic: string) => {
+    setSelectedTopic(topic === selectedTopic ? null : topic);
+  };
+
+  useEffect(() => {
+    searchSparks();
+  }, [selectedTopic, debouncedSearch]);
 
   const handleSparkSelect = (spark: Spark) => {
     setSelectedSpark(spark);
@@ -147,70 +202,157 @@ export const SparkSearchScreen = () => {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: theme.text.primary }]}>Search Sparks</Text>
+        <Text style={[styles.title, { color: theme.primary }]}>Search Sparks</Text>
         <Text style={[styles.subtitle, { color: theme.text.secondary }]}>
-          Find your past discoveries
+          Ignite your curiosity
         </Text>
       </View>
 
-      <View style={[styles.searchContainer, { borderBottomColor: theme.divider }]}>
-        <TextInput
-          style={[
-            styles.searchInput,
-            { 
-              backgroundColor: theme.card,
-              color: theme.text.primary,
-              borderColor: theme.cardBorder
-            }
-          ]}
-          placeholder="Search your sparks..."
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          placeholderTextColor={theme.text.secondary}
-          autoFocus
-          onSubmitEditing={() => {
-            if (searchQuery.trim()) {
-              saveRecentSearch(searchQuery.trim());
-              searchSparks();
-            }
-          }}
-          returnKeyType="search"
-        />
-        {loading && (
-          <ActivityIndicator 
-            style={styles.loadingIndicator} 
-            color={theme.primary}
+      <View style={styles.searchAndFiltersContainer}>
+        <View style={[styles.searchContainer, { 
+          backgroundColor: theme.card,
+          borderColor: theme.cardBorder,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.08,
+          shadowRadius: 4,
+          elevation: 2
+        }]}>
+          <TextInput
+            style={[
+              styles.searchInput,
+              { 
+                color: theme.text.primary,
+                borderColor: theme.cardBorder
+              }
+            ]}
+            placeholder="Search your sparks..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholderTextColor={theme.text.secondary}
+            autoFocus
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            onSubmitEditing={() => {
+              if (searchQuery.trim()) {
+                saveRecentSearch(searchQuery.trim());
+                searchSparks();
+              }
+            }}
+            returnKeyType="search"
           />
+          <TouchableOpacity 
+            style={styles.searchIconContainer}
+            onPress={() => {
+              if (searchQuery.trim()) {
+                saveRecentSearch(searchQuery.trim());
+                searchSparks();
+              }
+            }}
+          >
+            <Text style={[styles.searchIconText, { color: theme.primary }]}>🔍</Text>
+          </TouchableOpacity>
+          {loading && (
+            <ActivityIndicator 
+              style={styles.loadingIndicator} 
+              color={theme.primary}
+            />
+          )}
+          <Animated.View
+            style={[
+              styles.underline,
+              {
+                backgroundColor: theme.primary,
+                width: underlineAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ['0%', '100%'],
+                }),
+              },
+            ]}
+          />
+        </View>
+
+        {userTopics.length > 0 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.topicFilterContainer}
+            contentContainerStyle={styles.topicFilterContent}
+          >
+            <TouchableOpacity
+              style={[
+                styles.topicFilter,
+                !selectedTopic && styles.selectedTopicFilter,
+                { borderColor: !selectedTopic ? 'transparent' : theme.primary }
+              ]}
+              onPress={() => handleTopicSelect('All')}
+            >
+              <Text
+                style={[
+                  styles.topicFilterText,
+                  !selectedTopic && { color: '#FFFFFF' },
+                  selectedTopic && { color: theme.text.primary }
+                ]}
+              >
+                All Topics
+              </Text>
+            </TouchableOpacity>
+            {userTopics.map((topic) => (
+              <TouchableOpacity
+                key={topic}
+                style={[
+                  styles.topicFilter,
+                  selectedTopic === topic && styles.selectedTopicFilter,
+                  { borderColor: selectedTopic === topic ? 'transparent' : theme.primary }
+                ]}
+                onPress={() => handleTopicSelect(topic)}
+              >
+                <Text
+                  style={[
+                    styles.topicFilterText,
+                    selectedTopic === topic && { color: '#FFFFFF' },
+                    selectedTopic !== topic && { color: theme.text.primary }
+                  ]}
+                >
+                  {topic}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         )}
       </View>
 
-      {!searchQuery && recentSearches.length > 0 && (
-        <View style={styles.recentSearchesContainer}>
-          <Text style={[styles.recentSearchesTitle, { color: theme.text.secondary }]}>
-            Recent Searches
-          </Text>
-          <FlatList
-            data={recentSearches}
-            renderItem={({ item }) => (
-              <TouchableOpacity 
-                style={[
-                  styles.recentSearchItem,
-                  { borderBottomColor: theme.divider }
-                ]}
-                onPress={() => setSearchQuery(item)}
-              >
-                <Text style={styles.recentSearchIcon}>🕒</Text>
-                <Text style={[styles.recentSearchText, { color: theme.text.primary }]}>
-                  {item}
-                </Text>
-              </TouchableOpacity>
-            )}
-            keyExtractor={item => item}
-          />
-        </View>
+      {!searchQuery && !selectedTopic && (
+        <>
+          {recentSearches.length > 0 && (
+            <View style={styles.recentSearchesContainer}>
+              <Text style={[styles.recentSearchesTitle, { color: theme.text.secondary }]}>
+                Recent Searches
+              </Text>
+              <FlatList
+                data={recentSearches}
+                renderItem={({ item }) => (
+                  <TouchableOpacity 
+                    style={[
+                      styles.recentSearchItem,
+                      { borderBottomColor: theme.divider }
+                    ]}
+                    onPress={() => setSearchQuery(item)}
+                  >
+                    <Text style={styles.recentSearchIcon}>🕒</Text>
+                    <Text style={[styles.recentSearchText, { color: theme.text.primary }]}>
+                      {item}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                keyExtractor={item => item}
+              />
+            </View>
+          )}
+        </>
       )}
 
-      {searchQuery && (
+      {(searchQuery || selectedTopic) && (
         <FlatList
           data={results}
           renderItem={({ item }) => (
@@ -253,6 +395,17 @@ export const SparkSearchScreen = () => {
         />
       )}
 
+      {!searchQuery && !selectedTopic && recentSearches.length === 0 && userTopics.length === 0 && (
+        <View style={styles.emptyStateContainer}>
+          <Text style={[styles.emptyStateTitle, { color: theme.text.primary }]}>
+            No sparks found
+          </Text>
+          <Text style={[styles.emptyStateText, { color: theme.text.secondary }]}>
+            Start exploring new topics to collect sparks of knowledge!
+          </Text>
+        </View>
+      )}
+
       <SparkDetailModal
         spark={selectedSpark}
         visible={modalVisible}
@@ -271,7 +424,7 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: 20,
-    borderBottomWidth: 1,
+    paddingBottom: 10,
   },
   title: {
     fontSize: 28,
@@ -282,25 +435,78 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'AvenirNext-Regular',
   },
+  searchAndFiltersContainer: {
+    marginHorizontal: 20,
+  },
   searchContainer: {
-    padding: 16,
-    borderBottomWidth: 1,
+    padding: 12,
+    marginBottom: 8,
     flexDirection: 'row',
     alignItems: 'center',
+    position: 'relative',
+    borderRadius: 24,
+    height: 52,
   },
   searchInput: {
     flex: 1,
     height: 40,
-    borderRadius: 20,
     paddingHorizontal: 16,
     fontSize: 16,
     fontFamily: 'AvenirNext-Regular',
+    backgroundColor: 'transparent',
+  },
+  searchIconContainer: {
+    position: 'absolute',
+    right: 20,
+    zIndex: 1,
+    justifyContent: 'center',
+    height: '100%',
+  },
+  searchIconText: {
+    fontSize: 18,
+  },
+  underline: {
+    height: 2,
+    position: 'absolute',
+    bottom: 0,
+    left: 16,
+    right: 16,
+    maxWidth: '85%',
   },
   loadingIndicator: {
     marginLeft: 8,
   },
+  topicFilterContainer: {
+    marginTop: 0,
+    marginBottom: 16,
+    height: 44,
+  },
+  topicFilterContent: {
+    paddingHorizontal: 0,
+    alignItems: 'center',
+  },
+  topicFilter: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 24,
+    marginRight: 10,
+    borderWidth: 1,
+    backgroundColor: 'transparent',
+    height: 40,
+    justifyContent: 'center',
+    minWidth: 100,
+  },
+  selectedTopicFilter: {
+    backgroundColor: '#6B4EFF',
+    borderWidth: 0,
+  },
+  topicFilterText: {
+    fontFamily: 'AvenirNext-Medium',
+    fontSize: 14,
+    textAlign: 'center',
+  },
   recentSearchesContainer: {
-    padding: 16,
+    padding: 20,
   },
   recentSearchesTitle: {
     fontSize: 14,
@@ -322,7 +528,7 @@ const styles = StyleSheet.create({
     fontFamily: 'AvenirNext-Regular',
   },
   resultsList: {
-    padding: 16,
+    padding: 20,
   },
   sparkItem: {
     borderRadius: 12,
@@ -335,7 +541,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
-    color:'#6B4EFF',
   },
   sparkTopic: {
     fontSize: 14,
@@ -359,5 +564,23 @@ const styles = StyleSheet.create({
     fontFamily: 'AvenirNext-Regular',
     fontSize: 16,
     marginTop: 32,
+  },
+  emptyStateContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  emptyStateTitle: {
+    fontSize: 20,
+    fontFamily: 'AvenirNext-Bold',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  emptyStateText: {
+    fontSize: 16,
+    fontFamily: 'AvenirNext-Regular',
+    textAlign: 'center',
+    lineHeight: 24,
   },
 }); 
