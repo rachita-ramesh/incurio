@@ -25,6 +25,7 @@ import { FactHistoryScreen } from './src/screens/Account/FactHistoryScreen';
 import { AccountSettingsScreen } from './src/screens/Account/AccountSettingsScreen';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { lightTheme, darkTheme } from './src/theme/colors';
+import { UserProvider } from './src/contexts/UserContext';
 
 export type RootStackParamList = {
   Auth: undefined;
@@ -302,9 +303,11 @@ function AppContent(): React.JSX.Element {
 function App(): React.JSX.Element {
   return (
     <ThemeProvider>
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <AppContent />
-      </GestureHandlerRootView>
+      <UserProvider>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <AppContent />
+        </GestureHandlerRootView>
+      </UserProvider>
     </ThemeProvider>
   );
 }

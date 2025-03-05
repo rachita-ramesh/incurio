@@ -17,6 +17,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { notificationService } from '../../services/notificationService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../theme/ThemeContext';
+import { useUser } from '../../contexts/UserContext';
 
 type RootStackParamList = {
   Auth: undefined;
@@ -38,11 +39,24 @@ interface Spark {
 }
 
 export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
-  const { theme } = useTheme();
+  const { selectedTopics } = route.params;
   const [spark, setSpark] = useState<Spark | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sparkConsumed, setSparkConsumed] = useState(false);
+  const { user } = useUser();
+  const { theme } = useTheme();
+
+  // Show loading state immediately
+  useEffect(() => {
+    // Reset states when screen mounts
+    setLoading(true);
+    setError(null);
+    setSparkConsumed(false);
+    
+    // Load spark
+    loadSpark();
+  }, []);
 
   const handleSignOut = async () => {
     try {
@@ -69,85 +83,49 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
   }, [navigation]);
 
   const loadSpark = async () => {
-    let timeoutId: NodeJS.Timeout | undefined;
-    
     try {
       setLoading(true);
       setError(null);
-      
-      // Create an AbortController for the API request
-      const abortController = new AbortController();
-      
-      // Add timeout
-      timeoutId = setTimeout(() => {
-        abortController.abort();
-        setError('Taking too long to generate spark. Please try again.');
-        setLoading(false);
-      }, 30000); // 30 second timeout
-      
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
 
-      // Check if user has already consumed today's spark
-      const hasConsumed = await sparkGeneratorService.checkIfSparkAvailableToday(user.id);
-      if (hasConsumed) {
-        clearTimeout(timeoutId);
-        setSparkConsumed(true);
+      if (!user) {
+        setError('User not authenticated');
+        setLoading(false);
         return;
       }
 
-      // Check if we have a spark for today but haven't interacted with it
-      const hasSpark = await sparkGeneratorService.hasSparkForToday(user.id);
-      if (hasSpark) {
-        const storedSpark = await AsyncStorage.getItem(`${DAILY_SPARK_KEY}_${user.id}`);
-        if (storedSpark) {
-          const parsedSpark = JSON.parse(storedSpark);
-          setSpark({
-            id: parsedSpark.id,
-            content: parsedSpark.content,
-            topic: parsedSpark.topic,
-            details: parsedSpark.details,
-            sparkIndex: parsedSpark.sparkIndex
-          });
-          clearTimeout(timeoutId);
-          setLoading(false);
-          return;
-        }
+      // Check if sparks are available for today or if all consumed
+      const sparkAvailable = await sparkGeneratorService.checkIfSparkAvailableToday(user.id);
+      
+      if (!sparkAvailable) {
+        console.log('All sparks consumed for today');
+        setSparkConsumed(true);
+        setLoading(false);
+        return;
       }
 
-      const dailySpark = await sparkGeneratorService.getTodaysSpark(
+      // Get spark (this will now use the cache if available)
+      const loadedSpark = await sparkGeneratorService.getTodaysSpark(
         user.id,
-        route.params.selectedTopics,
-        'Prefer concise, interesting sparks that are easy to understand and ignite curiosity.'
+        selectedTopics,
+        JSON.stringify(user.preferences || [])
       );
-      
-      clearTimeout(timeoutId);
-      
-      if (!dailySpark) {
-        throw new Error(`Too early for today's spark. Please wait until 9:00 AM.`);
-      }
-      
-      if (!dailySpark.content || !dailySpark.id) {
-        throw new Error('Invalid spark received: missing content or ID');
-      }
-      
-      console.log('Setting spark with ID:', dailySpark.id);
-      setSpark({
-        id: dailySpark.id,
-        content: dailySpark.content,
-        topic: dailySpark.topic,
-        details: dailySpark.details,
-        sparkIndex: dailySpark.sparkIndex
-      });
-    } catch (err) {
-      console.error('Error loading spark:', err);
-      if (err instanceof Error) {
-        setError(err.message);
+
+      if (loadedSpark) {
+        setSpark({
+          id: loadedSpark.id,
+          content: loadedSpark.content,
+          topic: loadedSpark.topic,
+          details: loadedSpark.details,
+          sparkIndex: loadedSpark.sparkIndex
+        });
       } else {
-        setError('Failed to load today\'s spark. Please try again later.');
+        // If no spark available, all have been consumed
+        setSparkConsumed(true);
       }
+    } catch (error) {
+      console.error('Error loading spark:', error);
+      setError(`Error loading spark: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
-      if (timeoutId) clearTimeout(timeoutId);
       setLoading(false);
     }
   };
@@ -157,7 +135,7 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
       if (!sparkConsumed) {
         loadSpark();
       }
-    }, [route.params.selectedTopics, sparkConsumed])
+    }, [selectedTopics, sparkConsumed])
   );
 
   const handleInteraction = async () => {
@@ -172,8 +150,8 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
       // Try to get the next uninteracted spark
       const nextSpark = await sparkGeneratorService.getTodaysSpark(
         user.id,
-        route.params.selectedTopics,
-        'Prefer concise, interesting sparks that are easy to understand and ignite curiosity.'
+        selectedTopics,
+        JSON.stringify(user.preferences || [])
       );
 
       if (nextSpark) {

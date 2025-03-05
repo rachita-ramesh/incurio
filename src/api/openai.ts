@@ -30,7 +30,7 @@ export const generateSpark = async (
 ): Promise<GeneratedContent> => {
   try {
     const completion = await openai.beta.chat.completions.parse({
-      model: "gpt-4o-mini",
+      model: "gpt-4o",
       // Use the updated schema without minLength
       response_format: zodResponseFormat(SparkSchema, "spark"),
       messages: [
