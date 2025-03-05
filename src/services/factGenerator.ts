@@ -27,7 +27,7 @@ interface DailySpark {
 interface SparkCache {
   [userId: string]: {
     sparks: DailySpark[];
-    date: string;
+  date: string;
     lastUpdated: number;
   };
 }
@@ -126,7 +126,7 @@ export const sparkGeneratorService = {
         content: generatedSpark.content,
         topic: generatedSpark.topic,
         details: generatedSpark.details,
-        date: today,
+      date: today,
         userId: userId,
         generatedAt: new Date().toISOString(),
         sparkIndex: i + 1
@@ -154,60 +154,38 @@ export const sparkGeneratorService = {
     userPreferences: string
   ) {
     try {
+      console.log('=== Spark Generation Debug ===');
+      const now = new Date();
+      const today = getLocalDateString();
+      const userSparkKey = `${DAILY_SPARK_KEY}_${userId}`;
+
       // First check the in-memory cache
       const cachedSparks = this._getCachedSparks(userId);
       if (cachedSparks) {
         console.log('Using cached sparks for performance');
-        // Find the first uninteracted spark - need to properly await AsyncStorage calls
-        const allSparks = [...cachedSparks];
-        for (const spark of allSparks) {
-          const interactionKey = `${SPARK_INTERACTION_KEY}_${userId}_${spark.sparkIndex}`;
+        // Find the first uninteracted spark
+        for (const spark of cachedSparks) {
+          const interactionKey = `${SPARK_INTERACTION_KEY}_${userId}_${today}_${spark.sparkIndex}`;
           const interacted = await AsyncStorage.getItem(interactionKey);
           if (!interacted) {
             console.log('Found uninteracted spark from cache:', spark.sparkIndex);
             return spark;
           }
         }
-        
         console.log('All cached sparks have been interacted with');
         return null;
       }
-      
-      // If not in cache, proceed with normal AsyncStorage retrieval
-      console.log('Spark Generation Debug:', {
-        time: new Date().toLocaleTimeString(),
-        userId,
-        selectedTopics,
-      });
 
-      // Keep a reference to "now" for local time checks
-      const now = new Date();
-      // Local date string for "today"
-      const today = getLocalDateString();
-      const userSparkKey = `${DAILY_SPARK_KEY}_${userId}`;
-
-      // Production logging
-      console.log('=== Spark Generation Debug ===');
-      console.log('Current time (local):', now.toLocaleString());
-      console.log('Current time (ISO):', now.toISOString());
-      console.log("Today's date (local):", today);
-      console.log(
-        'Current decimal hours:',
-        now.getHours() + now.getMinutes() / 60
-      );
-      console.log('Target spark time:', SPARK_TIME);
-      console.log('User ID:', userId);
-      console.log('Selected topics:', selectedTopics);
-
-      // Check if we already have today's sparks for this user
+      // Check if we already have today's sparks in AsyncStorage
       const storedSparks = await AsyncStorage.getItem(userSparkKey);
       if (storedSparks) {
-        console.log('Found stored sparks');
         const parsedSparks: DailySpark[] = JSON.parse(storedSparks);
         if (parsedSparks[0]?.date === today) {
-          console.log("Found today's stored sparks");
+          console.log('Found stored sparks for today');
+          // Update cache with stored sparks
+          this._updateCache(userId, parsedSparks);
           
-          // Find the first uninteracted spark
+          // Find first uninteracted spark
           for (const spark of parsedSparks) {
             const interactionKey = `${SPARK_INTERACTION_KEY}_${userId}_${today}_${spark.sparkIndex}`;
             const hasInteraction = await AsyncStorage.getItem(interactionKey);
@@ -216,53 +194,25 @@ export const sparkGeneratorService = {
               return spark;
             }
           }
-          
-          // If all sparks have been interacted with, return null
           console.log('All sparks have been interacted with');
           return null;
         }
-        console.log('Stored sparks are old, removing');
+        console.log('Stored sparks are from a different day');
         await AsyncStorage.removeItem(userSparkKey);
-      } else {
-        console.log('No stored sparks found');
       }
 
-      // Convert current time to decimal hours for comparison
+      // Only generate new sparks if it's past spark time
       const currentTimeInHours = now.getHours() + now.getMinutes() / 60;
-      console.log('Time comparison:', {
-        current: currentTimeInHours.toFixed(3),
-        target: SPARK_TIME.toFixed(3),
-        shouldGenerate: currentTimeInHours >= SPARK_TIME,
-      });
-
-      // Check if it's past spark time
       if (currentTimeInHours >= SPARK_TIME) {
-        console.log('Past spark time, initiating generation');
-        try {
-          const sparks = await this.generateDailySpark(
-            userId,
-            selectedTopics,
-            userPreferences
-          );
-          console.log('Successfully generated new sparks');
-          return sparks;
-        } catch (error) {
-          console.error('Error generating sparks:', error);
-          throw error;
-        }
+        console.log('Generating new sparks for today');
+        const spark = await this.generateDailySpark(userId, selectedTopics, userPreferences);
+        return spark;
       } else {
-        console.log(
-          'Too early for spark, waiting until:',
-          `${Math.floor(SPARK_TIME)}:${Math.round(
-            (SPARK_TIME % 1) * 60
-          )
-            .toString()
-            .padStart(2, '0')}`
-        );
+        console.log('Too early for new sparks');
         return null;
       }
     } catch (error) {
-      console.error('Error retrieving today\'s spark:', error);
+      console.error('Error in getTodaysSpark:', error);
       throw error;
     }
   },

@@ -44,14 +44,16 @@ export const generateSpark = async (
             + "Response format:\n"
             + "{\n"
             + '  "content": "ONE spark using exactly ONE of the above formats (100-200 chars). NO calls to action. MUST BE UNIQUE AND DIFFERENT FROM PREVIOUS SPARKS.",\n'
-            + '  "details": "A captivating exploration (minimum 200 words)",\n'
+            + '  "details": "A captivating exploration without markdown headers (minimum 200 words). Write in a flowing, narrative style.",\n'
             + '  "topic": "MUST be one of the provided topics"\n'
             + "}\n\n"
             + "IMPORTANT:\n"
             + "- Each spark MUST be unique and different from others\n"
             + "- Avoid repetitive themes or similar concepts\n"
             + "- Focus on fascinating, lesser-known facts and perspectives\n"
-            + "- Make it engaging and scientifically accurate"
+            + "- Make it engaging and scientifically accurate\n"
+            + "- Do NOT use markdown headers (###) in the response\n"
+            + "- Write details in a flowing narrative style without section breaks"
         },
         {
           role: "user",

@@ -47,27 +47,6 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
   const { user } = useUser();
   const { theme } = useTheme();
 
-  // Show loading state immediately
-  useEffect(() => {
-    // Reset states when screen mounts
-    setLoading(true);
-    setError(null);
-    setSparkConsumed(false);
-    
-    // Load spark
-    loadSpark();
-  }, []);
-
-  const handleSignOut = async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      navigation.replace('Auth');
-    } catch (error) {
-      console.error('Sign out error:', error);
-    }
-  };
-
   useEffect(() => {
     navigation.setOptions({
       headerRight: () => (
@@ -88,11 +67,7 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
       setError(null);
 
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setError('User not authenticated');
-        setLoading(false);
-        return;
-      }
+      if (!user) throw new Error('User not authenticated');
 
       // Get user preferences from database
       const { data: userData, error: userError } = await supabase
@@ -107,30 +82,16 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
 
       const userPreferences = userData?.preferences || [];
 
-      // Check if all sparks have been consumed
-      const hasAvailableSpark = await sparkGeneratorService.checkIfSparkAvailableToday(user.id);
-      if (!hasAvailableSpark) {
-        console.log('All sparks consumed for today');
-        setSparkConsumed(true);
-        setLoading(false);
-        return;
-      }
-
-      // Get spark (this will now use the cache if available)
-      const loadedSpark = await sparkGeneratorService.getTodaysSpark(
+      // Get today's spark without forcing regeneration
+      const newSpark = await sparkGeneratorService.getTodaysSpark(
         user.id,
         selectedTopics,
-        JSON.stringify(userPreferences)
+        'Prefer concise, interesting sparks that are easy to understand and ignite curiosity.'
       );
 
-      if (loadedSpark) {
-        setSpark({
-          id: loadedSpark.id,
-          content: loadedSpark.content,
-          topic: loadedSpark.topic,
-          details: loadedSpark.details,
-          sparkIndex: loadedSpark.sparkIndex
-        });
+      if (newSpark) {
+        setSpark(newSpark);
+        setSparkConsumed(false);
       } else {
         // If no spark available, all have been consumed
         setSparkConsumed(true);
@@ -145,11 +106,21 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
 
   useFocusEffect(
     React.useCallback(() => {
-      if (!sparkConsumed) {
+      if (!sparkConsumed && !spark) {
         loadSpark();
       }
-    }, [selectedTopics, sparkConsumed])
+    }, [selectedTopics, sparkConsumed, spark])
   );
+
+  const handleSignOut = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      navigation.replace('Auth');
+    } catch (error) {
+      console.error('Sign out error:', error);
+    }
+  };
 
   const handleInteraction = async () => {
     try {
