@@ -319,7 +319,11 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
     );
   }
 
-  if (error || sparkConsumed) {
+  if (sparkConsumed) {
+    return <SparkConsumedScreen />;
+  }
+
+  if (error) {
     const now = new Date();
     const hours = Math.floor(SPARK_TIME);
     const minutes = Math.round((SPARK_TIME - hours) * 60);
@@ -328,19 +332,6 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
     const errorMessage = now.getHours() < SPARK_TIME
       ? `Today's spark will be ready at ${timeString}`
       : error;
-      const handleReset = async () => {
-        try {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (!user) return;
-          
-          await sparkGeneratorService.resetForTesting(user.id);
-          setSparkConsumed(false);
-          setError(null);
-          loadSpark();
-        } catch (error) {
-          console.error('Error resetting:', error);
-        }
-      };  
 
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -354,37 +345,10 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
                 <Text style={styles.retryButtonText}>Try Again</Text>
               </TouchableOpacity>
             )}
-            {__DEV__ && (
-              <TouchableOpacity 
-                style={[styles.retryButton, { backgroundColor: '#FF6B6B', marginTop: 10 }]} 
-                onPress={handleReset}
-              >
-                <Text style={styles.retryButtonText}>Reset For Testing</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-                <View style={styles.buttonContainer}>
-            {now.getHours() >= SPARK_TIME && (
-              <TouchableOpacity style={styles.retryButton} onPress={loadSpark}>
-                <Text style={styles.retryButtonText}>Try Again</Text>
-              </TouchableOpacity>
-            )}
-            {__DEV__ && (
-              <TouchableOpacity 
-                style={[styles.retryButton, { backgroundColor: '#FF6B6B', marginTop: 10 }]} 
-                onPress={handleReset}
-              >
-                <Text style={styles.retryButtonText}>Reset For Testing</Text>
-              </TouchableOpacity>
-            )}
           </View>
         </View>
       </SafeAreaView>
     );
-  }
-
-  if (sparkConsumed) {
-    return <SparkConsumedScreen />;
   }
 
   return (
