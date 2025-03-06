@@ -61,6 +61,7 @@ export const generateSpark = async (
             + "- Make it engaging and scientifically accurate\n"
             + "- Do NOT use markdown headers (###) in the response\n"
             + "- Write details in a flowing narrative style without section breaks"
+            + "- Do not mention the format name meaning don't say 'Surprising Insight' or 'Mind-Bending Perspective' or anything like that"
         },
         {
           role: "user",

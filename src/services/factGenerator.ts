@@ -114,7 +114,7 @@ export const sparkGeneratorService = {
         content: generatedSpark.content,
         topic: generatedSpark.topic,
         details: generatedSpark.details,
-      });
+      }, userId);
 
       if (error || !savedSpark || savedSpark.length === 0) {
         console.error('Error saving spark to Supabase:', error);

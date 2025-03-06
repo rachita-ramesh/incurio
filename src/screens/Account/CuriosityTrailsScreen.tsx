@@ -11,6 +11,7 @@ import {
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { supabase } from '../../api/supabase';
 import { useUser } from '../../contexts/UserContext';
+import { useTheme } from '../../theme/ThemeContext';
 
 type RootStackParamList = {
   CuriosityTrails: undefined;
@@ -38,6 +39,7 @@ export const CuriosityTrailsScreen: React.FC<Props> = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { user } = useUser();
+  const { theme } = useTheme();
 
   useEffect(() => {
     fetchRecommendations();
@@ -47,17 +49,19 @@ export const CuriosityTrailsScreen: React.FC<Props> = () => {
     try {
       if (!user) throw new Error('User not authenticated');
       
-      // Query sparks that are curiosity trails and have a user interaction from this user
+      // Directly query sparks that belong to the user and are curiosity trails
       const { data, error } = await supabase
         .from('sparks')
         .select(`
-          *,
-          user_interactions!inner (
-            user_id
-          )
+          id,
+          content,
+          topic,
+          details,
+          created_at,
+          recommendation
         `)
+        .eq('user_id', user.id)
         .eq('is_curiosity_trail', true)
-        .eq('user_interactions.user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -72,21 +76,48 @@ export const CuriosityTrailsScreen: React.FC<Props> = () => {
   };
 
   const renderItem = ({ item }: { item: Recommendation }) => (
-    <TouchableOpacity style={styles.card}>
+    <TouchableOpacity 
+      style={[
+        styles.card, 
+        { 
+          backgroundColor: theme.card,
+          borderColor: theme.cardBorder,
+          shadowColor: theme.primary,
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.08,
+          shadowRadius: 4,
+          elevation: 2
+        }
+      ]}
+    >
       <View style={styles.cardHeader}>
-        <Text style={styles.contentType}>{item.recommendation.type}</Text>
-        <Text style={styles.topic}>{item.topic}</Text>
+        <Text style={[
+          styles.contentType, 
+          { 
+            color: theme.primary,
+            backgroundColor: theme.surface 
+          }
+        ]}>
+          {item.recommendation.type}
+        </Text>
+        <Text style={[styles.topic, { color: theme.primary }]}>
+          {item.topic}
+        </Text>
       </View>
-      <Text style={styles.title}>{item.recommendation.title}</Text>
-      <Text style={styles.pitch}>{item.recommendation.why_recommended}</Text>
+      <Text style={[styles.title, { color: theme.text.primary }]}>
+        {item.recommendation.title}
+      </Text>
+      <Text style={[styles.pitch, { color: theme.text.secondary }]}>
+        {item.recommendation.why_recommended}
+      </Text>
     </TouchableOpacity>
   );
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#6B4EFF" />
+          <ActivityIndicator size="large" color={theme.primary} />
         </View>
       </SafeAreaView>
     );
@@ -94,22 +125,24 @@ export const CuriosityTrailsScreen: React.FC<Props> = () => {
 
   if (error) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
+          <Text style={[styles.errorText, { color: theme.error }]}>{error}</Text>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.header}>
         <View style={styles.headerRow}>
-          <Text style={styles.headerTitle}>My Curiosity Trails</Text>
+          <Text style={[styles.headerTitle, { color: theme.primary }]}>
+            My Curiosity Trails
+          </Text>
           <Text style={styles.headerIcon}>🗺️</Text>
         </View>
-        <Text style={styles.headerSubtitle}>
+        <Text style={[styles.headerSubtitle, { color: theme.text.secondary }]}>
           Personalized recommendations based on your interests
         </Text>
       </View>
@@ -120,7 +153,9 @@ export const CuriosityTrailsScreen: React.FC<Props> = () => {
         contentContainerStyle={styles.list}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No recommendations yet. Keep loving sparks to get personalized recommendations!</Text>
+            <Text style={[styles.emptyText, { color: theme.text.secondary }]}>
+              No recommendations yet. Keep loving sparks to get personalized recommendations!
+            </Text>
           </View>
         }
       />
@@ -131,7 +166,6 @@ export const CuriosityTrailsScreen: React.FC<Props> = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
   },
   loadingContainer: {
     flex: 1,
@@ -146,7 +180,6 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 16,
-    color: '#FF4444',
     textAlign: 'center',
   },
   emptyContainer: {
@@ -155,14 +188,11 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#666',
     textAlign: 'center',
     fontFamily: 'AvenirNext-Regular',
   },
   header: {
     padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
   },
   headerRow: {
     flexDirection: 'row',
@@ -170,9 +200,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 28,
     fontFamily: 'AvenirNext-Bold',
-    color: '#6B4EFF',
     marginRight: 8,
   },
   headerIcon: {
@@ -181,23 +210,15 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontSize: 16,
     fontFamily: 'AvenirNext-Regular',
-    color: '#666',
   },
   list: {
     padding: 20,
   },
   card: {
-    backgroundColor: '#fff',
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#6B4EFF',
-    shadowColor: '#6B4EFF',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -207,8 +228,6 @@ const styles = StyleSheet.create({
   contentType: {
     fontSize: 14,
     fontFamily: 'AvenirNext-DemiBold',
-    color: '#6B4EFF',
-    backgroundColor: '#F5F3FF',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
@@ -217,18 +236,15 @@ const styles = StyleSheet.create({
   topic: {
     fontSize: 14,
     fontFamily: 'AvenirNext-Medium',
-    color: '#4338CA',
   },
   title: {
     fontSize: 18,
     fontFamily: 'AvenirNext-DemiBold',
-    color: '#000',
     marginBottom: 8,
   },
   pitch: {
     fontSize: 16,
     fontFamily: 'AvenirNext-Regular',
-    color: '#666',
     lineHeight: 22,
   },
 }); 

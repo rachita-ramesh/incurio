@@ -43,13 +43,14 @@ export const supabaseApi = {
       .eq('id', userId);
   },
 
-  async saveSpark(spark: Omit<Spark, 'id' | 'created_at'>) {
+  async saveSpark(spark: Omit<Spark, 'id' | 'created_at'>, userId: string) {
     return await supabase
       .from('sparks')
       .insert([{
         content: spark.content,
         topic: spark.topic,
-        details: spark.details
+        details: spark.details,
+        user_id: userId
       }])
       .select();
   },
@@ -191,6 +192,7 @@ export const supabaseApi = {
         topic: topic,
         details: recommendation.details,
         is_curiosity_trail: true,
+        user_id: userId,
         recommendation: {
           title: recommendation.title,
           type: recommendation.type,
