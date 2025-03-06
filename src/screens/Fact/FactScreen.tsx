@@ -10,6 +10,8 @@ import {
 } from 'react-native';
 import { sparkGeneratorService, DAILY_SPARK_KEY, SPARK_TIME } from '../../services/factGenerator';
 import { supabase } from '../../api/supabase';
+import { supabaseApi } from '../../api/supabase';
+import { generateRecommendation, type GeneratedRecommendation } from '../../api/openai';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { SwipeableSpark } from '../../components/SwipeableFact';
 import { SparkConsumedScreen } from '../../components/SparkConsumedScreen';
@@ -18,6 +20,7 @@ import { notificationService } from '../../services/notificationService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../theme/ThemeContext';
 import { useUser } from '../../contexts/UserContext';
+import { RecommendationModal } from '../../components/RecommendationModal';
 
 type RootStackParamList = {
   Auth: undefined;
@@ -46,6 +49,12 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
   const [sparkConsumed, setSparkConsumed] = useState(false);
   const { user } = useUser();
   const { theme } = useTheme();
+  const [recommendationModal, setRecommendationModal] = useState<{
+    visible: boolean;
+    topic: string;
+    milestone: number;
+    recommendation: GeneratedRecommendation & { id: string };
+  } | null>(null);
 
   useEffect(() => {
     navigation.setOptions({
@@ -127,6 +136,10 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
       if (!spark) throw new Error('No spark available');
+      console.log('=== Processing Love Interaction ===');
+      console.log('User:', user.id);
+      console.log('Spark:', spark.id);
+      console.log('Topic:', spark.topic);
 
       // Get user preferences from database
       const { data: userData, error: userError } = await supabase
@@ -185,6 +198,11 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
       if (!user) throw new Error('User not authenticated');
       if (!spark) throw new Error('No spark available');
 
+      console.log('=== Processing Love Interaction ===');
+      console.log('User:', user.id);
+      console.log('Spark:', spark.id);
+      console.log('Topic:', spark.topic);
+
       // Save the love interaction
       const { error: interactionError } = await supabase
         .from('user_interactions')
@@ -195,8 +213,42 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
         }]);
 
       if (interactionError) throw interactionError;
-      console.log('Loved spark:', spark.content);
+      console.log('Saved love interaction successfully');
+
+      // Increment topic love count and check for milestone
+      const { hitNewMilestone, milestone } = await supabaseApi.incrementTopicLoveCount(user.id, spark.topic);
       
+      if (hitNewMilestone) {
+        console.log(`🎉 Hit new milestone of ${milestone} loves for topic ${spark.topic}!`);
+        
+        // Fetch loved sparks for this topic
+        const lovedSparks = await supabaseApi.getLovedSparksForTopic(user.id, spark.topic);
+        
+        // Generate recommendation using OpenAI
+        const recommendation = await generateRecommendation(spark.topic, lovedSparks);
+        
+        // Save the recommendation
+        const savedRecommendation = await supabaseApi.saveRecommendation(
+          user.id,
+          spark.topic,
+          recommendation,
+          milestone
+        );
+        
+        console.log('Successfully generated and saved recommendation:', savedRecommendation.id);
+        
+        // Show celebration modal
+        setRecommendationModal({
+          visible: true,
+          topic: spark.topic,
+          milestone,
+          recommendation: {
+            ...recommendation,
+            id: savedRecommendation.id
+          }
+        });
+      }
+
       await handleInteraction();
     } catch (error) {
       console.error('Error handling swipe up:', error);
@@ -267,7 +319,7 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
     );
   }
 
-  if (error) {
+  if (error || sparkConsumed) {
     const now = new Date();
     const hours = Math.floor(SPARK_TIME);
     const minutes = Math.round((SPARK_TIME - hours) * 60);
@@ -276,6 +328,19 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
     const errorMessage = now.getHours() < SPARK_TIME
       ? `Today's spark will be ready at ${timeString}`
       : error;
+      const handleReset = async () => {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) return;
+          
+          await sparkGeneratorService.resetForTesting(user.id);
+          setSparkConsumed(false);
+          setError(null);
+          loadSpark();
+        } catch (error) {
+          console.error('Error resetting:', error);
+        }
+      };  
 
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -283,11 +348,36 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
           <Text style={[styles.errorText, { color: theme.text.primary }]}>
             {errorMessage}
           </Text>
-          {now.getHours() >= SPARK_TIME && (
-            <TouchableOpacity style={styles.retryButton} onPress={loadSpark}>
-              <Text style={styles.retryButtonText}>Try Again</Text>
-            </TouchableOpacity>
-          )}
+          <View style={styles.buttonContainer}>
+            {now.getHours() >= SPARK_TIME && (
+              <TouchableOpacity style={styles.retryButton} onPress={loadSpark}>
+                <Text style={styles.retryButtonText}>Try Again</Text>
+              </TouchableOpacity>
+            )}
+            {__DEV__ && (
+              <TouchableOpacity 
+                style={[styles.retryButton, { backgroundColor: '#FF6B6B', marginTop: 10 }]} 
+                onPress={handleReset}
+              >
+                <Text style={styles.retryButtonText}>Reset For Testing</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+                <View style={styles.buttonContainer}>
+            {now.getHours() >= SPARK_TIME && (
+              <TouchableOpacity style={styles.retryButton} onPress={loadSpark}>
+                <Text style={styles.retryButtonText}>Try Again</Text>
+              </TouchableOpacity>
+            )}
+            {__DEV__ && (
+              <TouchableOpacity 
+                style={[styles.retryButton, { backgroundColor: '#FF6B6B', marginTop: 10 }]} 
+                onPress={handleReset}
+              >
+                <Text style={styles.retryButtonText}>Reset For Testing</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       </SafeAreaView>
     );
@@ -305,6 +395,16 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
           onSwipeLeft={handleSwipeLeft}
           onSwipeRight={handleSwipeRight}
           onSwipeUp={handleSwipeUp}
+        />
+      )}
+      
+      {recommendationModal && (
+        <RecommendationModal
+          visible={recommendationModal.visible}
+          onClose={() => setRecommendationModal(null)}
+          topic={recommendationModal.topic}
+          milestone={recommendationModal.milestone}
+          recommendation={recommendationModal.recommendation}
         />
       )}
     </SafeAreaView>
@@ -353,5 +453,9 @@ const styles = StyleSheet.create({
   },
   curiosityHubButtonText: {
     fontSize: 24,
+  },
+    buttonContainer: {
+    alignItems: 'center',
+    marginTop: 16,
   },
 }); 

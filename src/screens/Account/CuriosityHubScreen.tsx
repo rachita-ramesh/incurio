@@ -18,6 +18,7 @@ type RootStackParamList = {
   CuriosityHub: undefined;
   SparkSearch: undefined;
   AccountSettings: undefined;
+  CuriosityTrails: undefined;
 };
 
 type Props = {
@@ -33,6 +34,12 @@ export const CuriosityHubScreen: React.FC<Props> = ({ navigation }) => {
       subtitle: 'Find your past discoveries',
       onPress: () => navigation.navigate('SparkSearch'),
       icon: '🔍'
+    },
+    {
+      title: 'Curiosity Trails',
+      subtitle: 'Your personalized recommendations',
+      onPress: () => navigation.navigate('CuriosityTrails'),
+      icon: '🗺️'
     },
     {
       title: 'Woah Sparks',

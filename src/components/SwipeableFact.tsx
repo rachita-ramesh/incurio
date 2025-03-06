@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { useTheme } from '../theme/ThemeContext';
+import type { GeneratedRecommendation } from '../api/openai';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const SCREEN_HEIGHT = Dimensions.get('window').height;
@@ -24,6 +25,12 @@ interface SwipeableSparkProps {
     topic: string;
     details: string;
     sparkIndex: number;  // Index of current spark (1-5)
+    is_curiosity_trail?: boolean;
+    recommendation?: {
+      title: string;
+      type: 'book' | 'movie' | 'documentary';
+      why_recommended: string;
+    };
   };
   onSwipeLeft: () => void;   // Skip
   onSwipeRight: () => void;  // Like
@@ -97,6 +104,14 @@ export const SwipeableSpark: React.FC<SwipeableSparkProps> = ({
     ]).start();
   };
 
+  const getRecommendationEmoji = (type: 'book' | 'movie' | 'documentary') => {
+    switch (type) {
+      case 'book': return '📚';
+      case 'movie': return '🎬';
+      case 'documentary': return '🎥';
+    }
+  };
+
   return (
     <View style={styles.container}>
       <PanGestureHandler
@@ -122,19 +137,48 @@ export const SwipeableSpark: React.FC<SwipeableSparkProps> = ({
           }]}>
             <View style={styles.headerContent}>
               <View style={styles.topicContainer}>
-                <Text style={[styles.topicLabel, { color: theme.primary }]}>SPARK OF</Text>
-                <Text style={[styles.topic, { color: theme.primary }]}>{spark.topic.toUpperCase()}</Text>
+                <Text style={[styles.topicLabel, { color: theme.primary }]}>
+                  {spark.is_curiosity_trail ? 'CURIOSITY TRAIL' : 'SPARK OF'}
+                </Text>
+                <Text style={[styles.topic, { color: theme.primary }]}>
+                  {spark.topic.toUpperCase()}
+                </Text>
               </View>
             </View>
           </View>
           
           <View style={[styles.contentContainer, { backgroundColor: theme.surface }]}>
-            <Text style={[styles.content, { color: theme.text.primary }]}>{spark.content}</Text>
+            {spark.is_curiosity_trail && spark.recommendation ? (
+              // Recommendation Content
+              <View style={styles.recommendationContent}>
+                <View style={styles.recommendationType}>
+                  <Text style={[styles.recommendationTypeText, { color: theme.text.secondary }]}>
+                    RECOMMENDED {spark.recommendation.type.toUpperCase()}
+                  </Text>
+                  <Text style={styles.recommendationEmoji}>
+                    {getRecommendationEmoji(spark.recommendation.type)}
+                  </Text>
+                </View>
+                <Text style={[styles.recommendationTitle, { color: theme.text.primary }]}>
+                  {spark.recommendation.title}
+                </Text>
+                <Text style={[styles.recommendationWhy, { color: theme.text.secondary }]}>
+                  {spark.recommendation.why_recommended}
+                </Text>
+              </View>
+            ) : (
+              // Regular Spark Content
+              <Text style={[styles.content, { color: theme.text.primary }]}>
+                {spark.content}
+              </Text>
+            )}
             <TouchableOpacity 
               style={[styles.readMoreButton, { backgroundColor: theme.primary }]}
               onPress={() => setModalVisible(true)}
             >
-              <Text style={styles.readMoreText}>Dive Deeper 🔥</Text>
+              <Text style={styles.readMoreText}>
+                {spark.is_curiosity_trail ? 'Learn More 🎯' : 'Dive Deeper 🔥'}
+              </Text>
             </TouchableOpacity>
           </View>
           
@@ -171,7 +215,10 @@ export const SwipeableSpark: React.FC<SwipeableSparkProps> = ({
               backgroundColor: theme.surface
             }]}>
               <Text style={[styles.modalTopic, { color: theme.primary }]}>
-                EXPLORE THIS {spark.topic.toUpperCase()} SPARK
+                {spark.is_curiosity_trail ? 
+                  `EXPLORE THIS ${spark.topic.toUpperCase()} RECOMMENDATION` :
+                  `EXPLORE THIS ${spark.topic.toUpperCase()} SPARK`
+                }
               </Text>
               <TouchableOpacity 
                 style={styles.closeButton}
@@ -181,7 +228,9 @@ export const SwipeableSpark: React.FC<SwipeableSparkProps> = ({
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.modalScrollView}>
-              <Text style={[styles.modalDetails, { color: theme.text.primary }]}>{spark.details}</Text>
+              <Text style={[styles.modalDetails, { color: theme.text.primary }]}>
+                {spark.details}
+              </Text>
             </ScrollView>
           </View>
         </SafeAreaView>
@@ -347,5 +396,36 @@ const styles = StyleSheet.create({
     lineHeight: 28,
     textAlign: 'left',
     paddingBottom: 80,
+  },
+  recommendationContent: {
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  recommendationType: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  recommendationTypeText: {
+    fontSize: 14,
+    fontFamily: 'AvenirNext-DemiBold',
+    letterSpacing: 1,
+    marginRight: 8,
+  },
+  recommendationEmoji: {
+    fontSize: 24,
+  },
+  recommendationTitle: {
+    fontSize: 28,
+    fontFamily: 'AvenirNext-Bold',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  recommendationWhy: {
+    fontSize: 16,
+    fontFamily: 'AvenirNext-Regular',
+    textAlign: 'center',
+    fontStyle: 'italic',
+    marginBottom: 24,
   },
 });

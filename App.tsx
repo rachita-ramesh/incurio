@@ -26,6 +26,7 @@ import { AccountSettingsScreen } from './src/screens/Account/AccountSettingsScre
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { lightTheme, darkTheme } from './src/theme/colors';
 import { UserProvider } from './src/contexts/UserContext';
+import { CuriosityTrailsScreen } from './src/screens/Account/CuriosityTrailsScreen';
 
 export type RootStackParamList = {
   Auth: undefined;
@@ -38,6 +39,7 @@ export type RootStackParamList = {
   FactHistory: { filter: 'like' | 'love' | 'dislike' };
   SparkSearch: undefined;
   AccountSettings: undefined;
+  CuriosityTrails: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -289,6 +291,22 @@ function AppContent(): React.JSX.Element {
               fontFamily: 'AvenirNext-Medium',
               fontSize: 20,
               color: theme.primary
+            },
+            headerBackTitleStyle: {
+              fontFamily: 'AvenirNext-Regular',
+            },
+          }}
+        />
+        <Stack.Screen
+          name="CuriosityTrails"
+          component={CuriosityTrailsScreen}
+          options={{
+            headerShown: true,
+            title: '',
+            headerBackTitle: 'Back',
+            headerTintColor: theme.primary,
+            headerTitleStyle: {
+              fontFamily: 'AvenirNext-Medium',
             },
             headerBackTitleStyle: {
               fontFamily: 'AvenirNext-Regular',

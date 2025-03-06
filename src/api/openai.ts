@@ -1,8 +1,5 @@
 import OpenAI, { APIError } from 'openai';
 import { OPENAI_API_KEY } from '@env';
-// import { ChatCompletionMessage } from 'openai/resources/chat/completions';
-
-// Zod and OpenAI Zod helper
 import { z } from 'zod';
 import { zodResponseFormat } from 'openai/helpers/zod';
 
@@ -13,16 +10,26 @@ const SparkSchema = z.object({
   topic: z.string()
 });
 
+const RecommendationSchema = z.object({
+  title: z.string(),
+  type: z.enum(['book', 'movie', 'documentary']),
+  whyRecommended: z.string(),
+  details: z.string(),
+});
+
 interface GeneratedContent {
   content: string;
   topic: string;
   details: string;
 }
 
+export type GeneratedRecommendation = z.infer<typeof RecommendationSchema>;
+
 const openai = new OpenAI({
   apiKey: OPENAI_API_KEY,
   dangerouslyAllowBrowser: true
 });
+
 
 export const generateSpark = async (
   selectedTopics: string[],
@@ -97,6 +104,65 @@ export const generateSpark = async (
       });
     } else {
       console.error('Error generating content:', error);
+    }
+    throw error;
+  }
+};
+export const generateRecommendation = async (
+  topic: string,
+  lovedSparks: { content: string; topic: string }[]
+): Promise<GeneratedRecommendation> => {
+  try {
+    console.log('=== Generating Recommendation ===');
+    console.log('Topic:', topic);
+    console.log('Number of loved sparks:', lovedSparks.length);
+
+    const completion = await openai.beta.chat.completions.parse({
+      model: "gpt-4o",
+      response_format: zodResponseFormat(RecommendationSchema, "recommendation"),
+      messages: [
+        {
+          role: "user",
+          content: 
+            "You are a curiosity trail guide that recommends books, movies, or documentaries based on users' interests. "
+            + `The user has shown deep interest in ${topic} by loving ${lovedSparks.length} sparks about it. `
+            + "Some of the sparks they loved include:\n"
+            + lovedSparks.map(spark => `- ${spark.content}`).join('\n')
+            + "\n\n"
+            + "Recommend ONE engaging piece of content that would deepen their understanding and curiosity about this topic.\n\n"
+            + "Response format:\n"
+            + "{\n"
+            + '  "title": "The exact title of the recommended content",\n'
+            + '  "type": "book" OR "movie" OR "documentary",\n'
+            + '  "whyRecommended": "2-3 sentences explaining why this specifically matches their interests (150-200 chars)",\n'
+            + '  "details": "A concise, engaging description that builds curiosity without spoilers (MAXIMUM 200 words)"\n'
+            + "}\n\n"
+            + "IMPORTANT:\n"
+            + "- Choose content that's accessible and well-regarded\n"
+            + "- Make clear connections to their demonstrated interests\n"
+            + "- Focus on why this will spark more curiosity\n"
+            + "- Be specific about what makes this recommendation special\n"
+            + "- Keep the details section under 200 words\n"
+            + "- Write in an engaging, narrative style"
+        }
+      ],
+      temperature: 1.0,
+      seed: Date.now()
+    });
+
+    // Grab the validated, parsed result
+    const parsedResult = completion.choices[0]?.message?.parsed;
+    if (!parsedResult) {
+      throw new Error('No parsed content received from OpenAI');
+    }
+
+    console.log('Successfully generated recommendation');
+    return parsedResult;
+  } catch (error) {
+    if (error instanceof APIError) {
+      console.error('OpenAI API Error:', error.message, error.status);
+    } else {
+      console.error('Error generating recommendation:', error);
     }
     throw error;
   }

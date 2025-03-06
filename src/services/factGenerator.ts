@@ -313,6 +313,31 @@ export const sparkGeneratorService = {
     // Compare local times to see if it's past spark time
     return now >= sparkTime;
   },
+  async resetForTesting(userId: string) {
+    console.log('=== DEVELOPMENT MODE: Resetting sparks for testing ===');
+    try {
+      // Clear stored sparks
+      const userSparkKey = `${DAILY_SPARK_KEY}_${userId}`;
+      await AsyncStorage.removeItem(userSparkKey);
+      
+      // Clear all interaction markers for today
+      const today = getLocalDateString();
+      for (let i = 1; i <= TOTAL_DAILY_SPARKS; i++) {
+        const interactionKey = `${SPARK_INTERACTION_KEY}_${userId}_${today}_${i}`;
+        await AsyncStorage.removeItem(interactionKey);
+      }
+      
+      // Clear the cache
+      if (this._sparkCache[userId]) {
+        delete this._sparkCache[userId];
+      }
+      
+      console.log('Successfully reset sparks and interactions for testing');
+    } catch (error) {
+      console.error('Error resetting for testing:', error);
+      return false;
+    }
+  },
 };
 
 export default sparkGeneratorService;
