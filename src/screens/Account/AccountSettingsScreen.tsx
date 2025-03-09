@@ -7,10 +7,12 @@ import {
   SafeAreaView,
   Alert,
   Switch,
+  ScrollView,
 } from 'react-native';
 import { supabase } from '../../api/supabase';
 import { useTheme } from '../../theme/ThemeContext';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { backgroundTaskService } from '../../services/backgroundTaskService';
 
 type RootStackParamList = {
   Auth: undefined;
@@ -35,6 +37,16 @@ export const AccountSettingsScreen: React.FC<Props> = ({ navigation }) => {
     } catch (error) {
       console.error('Error signing out:', error);
       Alert.alert('Error', 'Failed to sign out. Please try again.');
+    }
+  };
+
+  const handleTestGeneration = async () => {
+    try {
+      await backgroundTaskService.testGenerationNow();
+      Alert.alert('Success', 'Test generation completed. Check the logs for details.');
+    } catch (error) {
+      console.error('Test generation error:', error);
+      Alert.alert('Error', 'Test generation failed. Check the logs for details.');
     }
   };
 
@@ -65,7 +77,7 @@ export const AccountSettingsScreen: React.FC<Props> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      <View style={styles.content}>
+      <ScrollView style={styles.content}>
         {settingsItems.map((item, index) => (
           <TouchableOpacity
             key={item.title}
@@ -105,7 +117,16 @@ export const AccountSettingsScreen: React.FC<Props> = ({ navigation }) => {
             </View>
           </TouchableOpacity>
         ))}
-      </View>
+
+        {__DEV__ && (
+          <TouchableOpacity
+            style={[styles.button, { backgroundColor: theme.primary }]}
+            onPress={handleTestGeneration}
+          >
+            <Text style={styles.buttonText}>Test Spark Generation</Text>
+          </TouchableOpacity>
+        )}
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -151,5 +172,16 @@ const styles = StyleSheet.create({
   settingSubtitle: {
     fontSize: 14,
     fontFamily: 'AvenirNext-Regular',
+  },
+  button: {
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  buttonText: {
+    fontSize: 16,
+    fontFamily: 'AvenirNext-Medium',
+    color: '#fff',
   },
 }); 

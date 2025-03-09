@@ -25,6 +25,7 @@ export interface Spark {
   topic: string;
   details: string;
   created_at: string;
+  user_id: string;
 }
 
 export interface UserInteraction {
@@ -43,7 +44,7 @@ export const supabaseApi = {
       .eq('id', userId);
   },
 
-  async saveSpark(spark: Omit<Spark, 'id' | 'created_at'>, userId: string) {
+  async saveSpark(spark: Omit<Spark, 'id' | 'created_at' | 'user_id'>, userId: string) {
     return await supabase
       .from('sparks')
       .insert([{
@@ -243,5 +244,20 @@ export const supabaseApi = {
 
     console.log('Found loved sparks:', transformedData.length);
     return transformedData;
+  },
+
+  async getSparksForDate(userId: string, date: string) {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    return await supabase
+      .from('sparks')
+      .select('*')
+      .eq('user_id', userId)
+      .gte('created_at', startOfDay.toISOString())
+      .lt('created_at', endOfDay.toISOString());
   }
 };

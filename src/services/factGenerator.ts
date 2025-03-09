@@ -19,7 +19,7 @@ interface DailySpark {
   details: string;
   date: string;        // Local date string
   userId: string;
-  generatedAt: string; // Full timestamp (still okay in UTC or local)
+  generatedAt: string; // Full timestamp
   sparkIndex: number;  // Index of the spark (1-7)
 }
 
@@ -33,12 +33,12 @@ interface SparkCache {
 }
 
 /**
- * Returns a string in YYYY-MM-DD format based on local time.
- * Example: "2025-02-21"
+ * Returns a string in YYYY-MM-DD format for a given date
+ * If no date is provided, returns today's date
  */
-function getLocalDateString(): string {
-  const date = new Date();
-  return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
+function getLocalDateString(date?: Date): string {
+  const targetDate = date || new Date();
+  return targetDate.toISOString().split('T')[0];
 }
 
 export const sparkGeneratorService = {
@@ -96,20 +96,21 @@ export const sparkGeneratorService = {
     selectedTopics: string[],
     userPreferences: string
   ) {
-    // Use local date for "today"
-    const today = getLocalDateString();
+    // Use tomorrow's date for pre-generation
+    const targetDate = new Date();
+    targetDate.setDate(targetDate.getDate() + 1);
+    const tomorrow = getLocalDateString(targetDate);
+    
     const sparks: DailySpark[] = [];
 
-    // Generate 5 sparks
+    // Generate sparks
     for (let i = 0; i < TOTAL_DAILY_SPARKS; i++) {
-      // Apply bandit algorithm to potentially include non-selected topics
       const topicsForGeneration = this.selectTopicsWithBandit(selectedTopics);
 
-      // Generate new spark
       console.log(`Generating spark ${i + 1} of ${TOTAL_DAILY_SPARKS} for topics:`, topicsForGeneration);
       const generatedSpark = await generateSpark(topicsForGeneration, userPreferences);
 
-      // Save to Supabase first to get the ID
+      // Save to Supabase
       const { data: savedSpark, error } = await supabaseApi.saveSpark({
         content: generatedSpark.content,
         topic: generatedSpark.topic,
@@ -126,7 +127,7 @@ export const sparkGeneratorService = {
         content: generatedSpark.content,
         topic: generatedSpark.topic,
         details: generatedSpark.details,
-      date: today,
+        date: tomorrow,
         userId: userId,
         generatedAt: new Date().toISOString(),
         sparkIndex: i + 1
@@ -135,17 +136,14 @@ export const sparkGeneratorService = {
       sparks.push(spark);
     }
 
-    // Save all sparks to local storage
+    // Save to local storage
     const userSparkKey = `${DAILY_SPARK_KEY}_${userId}`;
     await AsyncStorage.setItem(userSparkKey, JSON.stringify(sparks));
 
-    // Schedule next day's notification
-    notificationService.scheduleDailyNotification();
-
-    // After successfully generating sparks, update the cache
+    // Update cache
     this._updateCache(userId, sparks);
 
-    return sparks[0]; // Return the first spark to maintain compatibility
+    return sparks[0];
   },
 
   async getTodaysSpark(
@@ -158,6 +156,13 @@ export const sparkGeneratorService = {
       const now = new Date();
       const today = getLocalDateString();
       const userSparkKey = `${DAILY_SPARK_KEY}_${userId}`;
+
+      // Check if it's past 9 AM
+      const currentTimeInHours = now.getHours() + now.getMinutes() / 60;
+      if (currentTimeInHours < SPARK_TIME) {
+        console.log('Too early for sparks - wait until 9 AM');
+        return null;
+      }
 
       // First check the in-memory cache
       const cachedSparks = this._getCachedSparks(userId);
@@ -201,16 +206,10 @@ export const sparkGeneratorService = {
         await AsyncStorage.removeItem(userSparkKey);
       }
 
-      // Only generate new sparks if it's past spark time
-      const currentTimeInHours = now.getHours() + now.getMinutes() / 60;
-      if (currentTimeInHours >= SPARK_TIME) {
-        console.log('Generating new sparks for today');
-        const spark = await this.generateDailySpark(userId, selectedTopics, userPreferences);
-        return spark;
-      } else {
-        console.log('Too early for new sparks');
-        return null;
-      }
+      // Generate new sparks if none exist
+      console.log('Generating new sparks for today');
+      const spark = await this.generateDailySpark(userId, selectedTopics, userPreferences);
+      return spark;
     } catch (error) {
       console.error('Error in getTodaysSpark:', error);
       throw error;
@@ -313,31 +312,35 @@ export const sparkGeneratorService = {
     // Compare local times to see if it's past spark time
     return now >= sparkTime;
   },
-  // async resetForTesting(userId: string) {
-  //   console.log('=== DEVELOPMENT MODE: Resetting sparks for testing ===');
-  //   try {
-  //     // Clear stored sparks
-  //     const userSparkKey = `${DAILY_SPARK_KEY}_${userId}`;
-  //     await AsyncStorage.removeItem(userSparkKey);
-      
-  //     // Clear all interaction markers for today
-  //     const today = getLocalDateString();
-  //     for (let i = 1; i <= TOTAL_DAILY_SPARKS; i++) {
-  //       const interactionKey = `${SPARK_INTERACTION_KEY}_${userId}_${today}_${i}`;
-  //       await AsyncStorage.removeItem(interactionKey);
-  //     }
-      
-  //     // Clear the cache
-  //     if (this._sparkCache[userId]) {
-  //       delete this._sparkCache[userId];
-  //     }
-      
-  //     console.log('Successfully reset sparks and interactions for testing');
-  //   } catch (error) {
-  //     console.error('Error resetting for testing:', error);
-  //     return false;
-  //   }
-  // },
+
+  async hasSparkForDate(userId: string, date: Date): Promise<boolean> {
+    const targetDate = getLocalDateString(date);
+    
+    // First check cache
+    const cachedSparks = this._getCachedSparks(userId);
+    if (cachedSparks && cachedSparks[0]?.date === targetDate) {
+      return true;
+    }
+
+    // Then check local storage
+    const userSparkKey = `${DAILY_SPARK_KEY}_${userId}`;
+    const storedSparks = await AsyncStorage.getItem(userSparkKey);
+    if (storedSparks) {
+      const parsedSparks: DailySpark[] = JSON.parse(storedSparks);
+      if (parsedSparks[0]?.date === targetDate) {
+        return true;
+      }
+    }
+
+    // Finally check Supabase
+    const { data: sparks, error } = await supabaseApi.getSparksForDate(userId, targetDate);
+    if (error) {
+      console.error('Error checking sparks in Supabase:', error);
+      return false;
+    }
+
+    return sparks && sparks.length > 0;
+  },
 };
 
 export default sparkGeneratorService;
