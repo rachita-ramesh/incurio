@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -47,6 +47,17 @@ export const SwipeableSpark: React.FC<SwipeableSparkProps> = ({
   const [modalVisible, setModalVisible] = useState(false);
   const translateX = new Animated.Value(0);
   const translateY = new Animated.Value(0);
+  const scaleAnim = new Animated.Value(0.9);  // Start smaller for more visible effect
+
+  useEffect(() => {
+    // Animate to full size when card appears
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      tension: 35,    // Lower tension for slower animation
+      friction: 6,    // Less friction for smoother movement
+    }).start();
+  }, [spark.sparkIndex]);
 
   const onGestureEvent = Animated.event(
     [{ nativeEvent: { translationX: translateX, translationY: translateY } }],
@@ -127,6 +138,7 @@ export const SwipeableSpark: React.FC<SwipeableSparkProps> = ({
               transform: [
                 { translateX },
                 { translateY },
+                { scale: scaleAnim }  // Add scale animation
               ] 
             }
           ]}
