@@ -23,15 +23,6 @@ interface DailySpark {
   sparkIndex: number;  // Index of the spark (1-7)
 }
 
-// Add caching mechanism
-interface SparkCache {
-  [userId: string]: {
-    sparks: DailySpark[];
-  date: string;
-    lastUpdated: number;
-  };
-}
-
 /**
  * Returns a string in YYYY-MM-DD format for a given date
  * If no date is provided, returns today's date
@@ -42,46 +33,6 @@ function getLocalDateString(date?: Date): string {
 }
 
 export const sparkGeneratorService = {
-  // In-memory cache for faster retrieval
-  _sparkCache: {} as SparkCache,
-
-  // Check if we have valid cached sparks for this user
-  _getCachedSparks(userId: string): DailySpark[] | null {
-    const cache = this._sparkCache[userId];
-    const today = getLocalDateString();
-    
-    // Clear cache if it's from a different day
-    if (cache && cache.date !== today) {
-      console.log('Cache from different day, invalidating');
-      delete this._sparkCache[userId];
-      return null;
-    }
-    
-    if (cache && cache.date === today) {
-      console.log('Cache hit: Using in-memory cached sparks');
-      return cache.sparks;
-    }
-    
-    console.log('Cache miss: No valid cached sparks found');
-    return null;
-  },
-
-  // Update the cache with new sparks
-  _updateCache(userId: string, sparks: DailySpark[]) {
-    this._sparkCache[userId] = {
-      sparks,
-      date: getLocalDateString(),
-      lastUpdated: Date.now()
-    };
-    console.log('Cache updated with new sparks');
-  },
-
-  // Invalidate cache for a user
-  _invalidateCache(userId: string) {
-    delete this._sparkCache[userId];
-    console.log('Cache invalidated for user:', userId);
-  },
-
   selectTopicsWithBandit(userSelectedTopics: string[]): string[] {
     // 20% chance to explore non-selected topics
     if (Math.random() < VARIETY_PROBABILITY) {
@@ -106,11 +57,7 @@ export const sparkGeneratorService = {
     selectedTopics: string[],
     userPreferences: string
   ) {
-    // Use tomorrow's date for pre-generation
-    const targetDate = new Date();
-    targetDate.setDate(targetDate.getDate() + 1);
-    const tomorrow = getLocalDateString(targetDate);
-    
+    const today = getLocalDateString();
     const sparks: DailySpark[] = [];
 
     // Generate sparks
@@ -124,7 +71,7 @@ export const sparkGeneratorService = {
       const { data: savedSpark, error } = await supabaseApi.saveSpark({
         content: generatedSpark.content,
         topic: generatedSpark.topic,
-        details: generatedSpark.details,
+        details: generatedSpark.details
       }, userId);
 
       if (error || !savedSpark || savedSpark.length === 0) {
@@ -137,9 +84,9 @@ export const sparkGeneratorService = {
         content: generatedSpark.content,
         topic: generatedSpark.topic,
         details: generatedSpark.details,
-        date: tomorrow,
+        date: today,
         userId: userId,
-        generatedAt: new Date().toISOString(),
+        generatedAt: savedSpark[0].created_at,
         sparkIndex: i + 1
       };
 
@@ -149,9 +96,6 @@ export const sparkGeneratorService = {
     // Save to local storage
     const userSparkKey = `${DAILY_SPARK_KEY}_${userId}`;
     await AsyncStorage.setItem(userSparkKey, JSON.stringify(sparks));
-
-    // Update cache
-    this._updateCache(userId, sparks);
 
     return sparks[0];
   },
@@ -165,7 +109,6 @@ export const sparkGeneratorService = {
       console.log('=== Spark Generation Debug ===');
       const now = new Date();
       const today = getLocalDateString();
-      const userSparkKey = `${DAILY_SPARK_KEY}_${userId}`;
 
       // Check if it's past 9 AM
       const currentTimeInHours = now.getHours() + now.getMinutes() / 60;
@@ -174,50 +117,51 @@ export const sparkGeneratorService = {
         return null;
       }
 
-      // First check the in-memory cache
-      const cachedSparks = this._getCachedSparks(userId);
-      if (cachedSparks) {
-        console.log('Using cached sparks for performance');
-        // Find the first uninteracted spark
-        for (const spark of cachedSparks) {
-          const interactionKey = `${SPARK_INTERACTION_KEY}_${userId}_${today}_${spark.sparkIndex}`;
-          const interacted = await AsyncStorage.getItem(interactionKey);
-          if (!interacted) {
-            console.log('Found uninteracted spark from cache:', spark.sparkIndex);
-            return spark;
+      // Check Supabase for today's sparks
+      console.log('Checking Supabase for existing sparks');
+      const { data: existingSparks, error: sparksError } = await supabaseApi.getSparksForDate(userId, today);
+      
+      if (sparksError) {
+        console.error('Error checking Supabase:', sparksError);
+        throw sparksError;
+      }
+
+      // If we found sparks in Supabase, use them
+      if (existingSparks && existingSparks.length > 0) {
+        console.log('Found existing sparks in Supabase:', existingSparks.length);
+        
+        // Find first uninteracted spark
+        for (let i = 0; i < existingSparks.length; i++) {
+          const spark = existingSparks[i];
+          try {
+            const interactionKey = `${SPARK_INTERACTION_KEY}_${userId}_${today}_${i + 1}`;
+            const hasInteraction = await AsyncStorage.getItem(interactionKey);
+            if (!hasInteraction) {
+              return {
+                ...spark,
+                sparkIndex: i + 1,
+                date: today,
+                userId: userId
+              };
+            }
+          } catch (interactionError) {
+            console.warn('Failed to check interaction:', interactionError);
+            // If we can't check interactions, return first spark
+            return {
+              ...spark,
+              sparkIndex: 1,
+              date: today,
+              userId: userId
+            };
           }
         }
-        console.log('All cached sparks have been interacted with');
+
+        console.log('All sparks have been interacted with');
         return null;
       }
 
-      // Check if we already have today's sparks in AsyncStorage
-      const storedSparks = await AsyncStorage.getItem(userSparkKey);
-      if (storedSparks) {
-        const parsedSparks: DailySpark[] = JSON.parse(storedSparks);
-        if (parsedSparks[0]?.date === today) {
-          console.log('Found stored sparks for today');
-          // Update cache with stored sparks
-          this._updateCache(userId, parsedSparks);
-          
-          // Find first uninteracted spark
-          for (const spark of parsedSparks) {
-            const interactionKey = `${SPARK_INTERACTION_KEY}_${userId}_${today}_${spark.sparkIndex}`;
-            const hasInteraction = await AsyncStorage.getItem(interactionKey);
-            if (!hasInteraction) {
-              console.log(`Returning uninteracted spark ${spark.sparkIndex}`);
-              return spark;
-            }
-          }
-          console.log('All sparks have been interacted with');
-          return null;
-        }
-        console.log('Stored sparks are from a different day');
-        await AsyncStorage.removeItem(userSparkKey);
-      }
-
-      // Generate new sparks if none exist
-      console.log('Generating new sparks for today');
+      // If no sparks exist, generate new ones
+      console.log('No existing sparks found, generating new ones');
       const spark = await this.generateDailySpark(userId, selectedTopics, userPreferences);
       return spark;
     } catch (error) {
@@ -249,45 +193,19 @@ export const sparkGeneratorService = {
 
   async markSparkAsInteracted(userId: string, sparkIndex: number): Promise<void> {
     try {
-      // Use local date for interaction key
       const today = getLocalDateString();
-      const userInteractionKey = `${SPARK_INTERACTION_KEY}_${userId}_${today}_${sparkIndex}`;
-      await AsyncStorage.setItem(userInteractionKey, 'true');
-
-      // Check if all sparks have been interacted with
-      let allInteracted = true;
-      for (let i = 1; i <= TOTAL_DAILY_SPARKS; i++) {
-        const interactionKey = `${SPARK_INTERACTION_KEY}_${userId}_${today}_${i}`;
-        const hasInteraction = await AsyncStorage.getItem(interactionKey);
-        if (!hasInteraction) {
-          allInteracted = false;
-          break;
-        }
-      }
-
-      // Only cancel notification if all sparks have been interacted with
-      if (allInteracted) {
-        notificationService.cancelTodayNotification();
-      }
-
-      // If we have cached sparks, mark them as interacted in the cache too
-      if (this._sparkCache[userId]) {
-        console.log('Updating interaction status in cache');
-        // We don't need to modify the cache objects directly since we're just checking
-        // for interacted status using AsyncStorage in our filter logic
-      }
+      const interactionKey = `${SPARK_INTERACTION_KEY}_${userId}_${today}_${sparkIndex}`;
+      await AsyncStorage.setItem(interactionKey, 'true');
     } catch (error) {
       console.error('Error marking spark as interacted:', error);
-      throw error;
+      // Don't throw - if we can't mark interaction, user might see same spark again
+      console.warn('User might see this spark again due to interaction tracking failure');
     }
   },
 
   async clearStoredSpark(userId: string) {
     try {
       await AsyncStorage.removeItem(`${DAILY_SPARK_KEY}_${userId}`);
-      
-      // Also clear the cache for this user
-      this._invalidateCache(userId);
       
       // Remove all interaction markers
       for (let i = 1; i <= TOTAL_DAILY_SPARKS; i++) {
@@ -325,25 +243,8 @@ export const sparkGeneratorService = {
 
   async hasSparkForDate(userId: string, date: Date): Promise<boolean> {
     const targetDate = getLocalDateString(date);
-    
-    // First check cache
-    const cachedSparks = this._getCachedSparks(userId);
-    if (cachedSparks && cachedSparks[0]?.date === targetDate) {
-      return true;
-    }
-
-    // Then check local storage
-    const userSparkKey = `${DAILY_SPARK_KEY}_${userId}`;
-    const storedSparks = await AsyncStorage.getItem(userSparkKey);
-    if (storedSparks) {
-      const parsedSparks: DailySpark[] = JSON.parse(storedSparks);
-      if (parsedSparks[0]?.date === targetDate) {
-        return true;
-      }
-    }
-
-    // Finally check Supabase
     const { data: sparks, error } = await supabaseApi.getSparksForDate(userId, targetDate);
+    
     if (error) {
       console.error('Error checking sparks in Supabase:', error);
       return false;

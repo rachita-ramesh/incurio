@@ -253,11 +253,12 @@ export const supabaseApi = {
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
 
+    // Get sparks created for this date (either created today or pre-generated yesterday)
     return await supabase
       .from('sparks')
       .select('*')
       .eq('user_id', userId)
-      .gte('created_at', startOfDay.toISOString())
+      .or(`created_at.gte.${startOfDay.toISOString()},created_at.gte.${new Date(startOfDay.getTime() - 24*60*60*1000).toISOString()}`)
       .lt('created_at', endOfDay.toISOString());
   }
 };
