@@ -41,6 +41,14 @@ export const CuriosityTrailsScreen: React.FC<Props> = () => {
   const { user } = useUser();
   const { theme } = useTheme();
 
+  const getRecommendationEmoji = (type: 'book' | 'movie' | 'documentary') => {
+    switch (type) {
+      case 'book': return '📚';
+      case 'movie': return '🎬';
+      case 'documentary': return '🎥';
+    }
+  };
+
   useEffect(() => {
     fetchRecommendations();
   }, []);
@@ -98,7 +106,7 @@ export const CuriosityTrailsScreen: React.FC<Props> = () => {
             backgroundColor: theme.surface 
           }
         ]}>
-          {item.recommendation.type}
+          {item.recommendation.type.toUpperCase()} {getRecommendationEmoji(item.recommendation.type)}
         </Text>
         <Text style={[styles.topic, { color: theme.primary }]}>
           {item.topic}
