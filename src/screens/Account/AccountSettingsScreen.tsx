@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -28,6 +28,17 @@ type Props = {
 
 export const AccountSettingsScreen: React.FC<Props> = ({ navigation }) => {
   const { theme, isDark, toggleTheme } = useTheme();
+  const [userEmail, setUserEmail] = useState<string>('');
+
+  useEffect(() => {
+    const getUserEmail = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.email) {
+        setUserEmail(user.email);
+      }
+    };
+    getUserEmail();
+  }, []);
 
   const handleSignOut = async () => {
     try {
@@ -37,16 +48,6 @@ export const AccountSettingsScreen: React.FC<Props> = ({ navigation }) => {
     } catch (error) {
       console.error('Error signing out:', error);
       Alert.alert('Error', 'Failed to sign out. Please try again.');
-    }
-  };
-
-  const handleTestGeneration = async () => {
-    try {
-      await backgroundTaskService.testGenerationNow();
-      Alert.alert('Success', 'Test generation completed. Check the logs for details.');
-    } catch (error) {
-      console.error('Test generation error:', error);
-      Alert.alert('Error', 'Test generation failed. Check the logs for details.');
     }
   };
 
@@ -65,68 +66,84 @@ export const AccountSettingsScreen: React.FC<Props> = ({ navigation }) => {
       icon: isDark ? '🌙' : '☀️',
       showToggle: true,
       isToggled: isDark,
-    },
-    {
-      title: 'Sign Out',
-      subtitle: 'See you next time',
-      onPress: handleSignOut,
-      icon: '👋',
-      showToggle: false,
     }
   ];
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      <ScrollView style={styles.content}>
-        {settingsItems.map((item, index) => (
-          <TouchableOpacity
-            key={item.title}
-            style={[
-              styles.settingItem,
-              { 
-                backgroundColor: theme.card,
-                borderColor: theme.cardBorder,
-              },
-              item.title === 'Sign Out' && styles.signOutItem
-            ]}
-            onPress={item.onPress}
-          >
-            <View style={styles.settingContent}>
-              <Text style={styles.settingIcon}>{item.icon}</Text>
-              <View style={styles.settingText}>
-                <Text style={[
-                  styles.settingTitle,
-                  { color: theme.text.primary },
-                  item.title === 'Sign Out' && styles.signOutText
-                ]}>
-                  {item.title}
-                </Text>
-                <Text style={[styles.settingSubtitle, { color: theme.text.secondary }]}>
-                  {item.subtitle}
-                </Text>
+      <View style={styles.content}>
+        <ScrollView style={styles.scrollContent}>
+          {settingsItems.map((item) => (
+            <TouchableOpacity
+              key={item.title}
+              style={[
+                styles.settingItem,
+                { 
+                  backgroundColor: theme.card,
+                  borderColor: theme.cardBorder,
+                }
+              ]}
+              onPress={item.onPress}
+            >
+              <View style={styles.settingContent}>
+                <Text style={styles.settingIcon}>{item.icon}</Text>
+                <View style={styles.settingText}>
+                  <Text style={[
+                    styles.settingTitle,
+                    { color: theme.text.primary }
+                  ]}>
+                    {item.title}
+                  </Text>
+                  <Text style={[styles.settingSubtitle, { color: theme.text.secondary }]}>
+                    {item.subtitle}
+                  </Text>
+                </View>
+                {item.showToggle && (
+                  <Switch
+                    value={item.isToggled}
+                    onValueChange={toggleTheme}
+                    trackColor={{ false: '#767577', true: theme.primary }}
+                    thumbColor={isDark ? '#fff' : '#f4f3f4'}
+                    ios_backgroundColor="#767577"
+                  />
+                )}
               </View>
-              {item.showToggle && (
-                <Switch
-                  value={item.isToggled}
-                  onValueChange={toggleTheme}
-                  trackColor={{ false: '#767577', true: theme.primary }}
-                  thumbColor={isDark ? '#fff' : '#f4f3f4'}
-                  ios_backgroundColor="#767577"
-                />
-              )}
-            </View>
-          </TouchableOpacity>
-        ))}
+            </TouchableOpacity>
+          ))}
 
-        {__DEV__ && (
-          <TouchableOpacity
-            style={[styles.button, { backgroundColor: theme.primary }]}
-            onPress={handleTestGeneration}
-          >
-            <Text style={styles.buttonText}>Test Spark Generation</Text>
-          </TouchableOpacity>
-        )}
-      </ScrollView>
+          <View style={[styles.profileSection, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}>
+            <Text style={styles.profileIcon}>🧙‍♂️</Text>
+            <View style={styles.profileInfo}>
+              <Text style={[styles.profileLabel, { color: theme.text.secondary }]}>SIGNED IN AS</Text>
+              <Text style={[styles.profileEmail, { color: theme.text.primary }]}>{userEmail}</Text>
+            </View>
+          </View>
+        </ScrollView>
+
+        <TouchableOpacity
+          style={[
+            styles.settingItem,
+            styles.signOutItem,
+            { 
+              backgroundColor: theme.card,
+              borderColor: theme.cardBorder,
+            }
+          ]}
+          onPress={handleSignOut}
+        >
+          <View style={styles.settingContent}>
+            <Text style={styles.settingIcon}>👋</Text>
+            <View style={styles.settingText}>
+              <Text style={[styles.settingTitle, styles.signOutText]}>
+                Sign Out
+              </Text>
+              <Text style={[styles.settingSubtitle, { color: theme.text.secondary }]}>
+                See you next time
+              </Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 };
@@ -139,6 +156,35 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
   },
+  scrollContent: {
+    flex: 1,
+    marginBottom: 20,
+  },
+  profileSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+    borderWidth: 1,
+  },
+  profileIcon: {
+    fontSize: 32,
+    marginRight: 16,
+  },
+  profileInfo: {
+    flex: 1,
+  },
+  profileLabel: {
+    fontSize: 12,
+    fontFamily: 'AvenirNext-Medium',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  profileEmail: {
+    fontSize: 16,
+    fontFamily: 'AvenirNext-Regular',
+  },
   settingItem: {
     borderRadius: 12,
     padding: 16,
@@ -146,8 +192,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   signOutItem: {
-    marginTop: 'auto',
     borderStyle: 'dashed',
+    marginBottom: 0,
   },
   settingContent: {
     flexDirection: 'row',
@@ -172,16 +218,5 @@ const styles = StyleSheet.create({
   settingSubtitle: {
     fontSize: 14,
     fontFamily: 'AvenirNext-Regular',
-  },
-  button: {
-    borderRadius: 12,
-    padding: 16,
-    marginTop: 20,
-    alignItems: 'center',
-  },
-  buttonText: {
-    fontSize: 16,
-    fontFamily: 'AvenirNext-Medium',
-    color: '#fff',
   },
 }); 
