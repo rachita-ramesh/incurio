@@ -48,10 +48,20 @@ export const sparkGeneratorService = {
   // Check if we have valid cached sparks for this user
   _getCachedSparks(userId: string): DailySpark[] | null {
     const cache = this._sparkCache[userId];
-    if (cache && cache.date === getLocalDateString()) {
+    const today = getLocalDateString();
+    
+    // Clear cache if it's from a different day
+    if (cache && cache.date !== today) {
+      console.log('Cache from different day, invalidating');
+      delete this._sparkCache[userId];
+      return null;
+    }
+    
+    if (cache && cache.date === today) {
       console.log('Cache hit: Using in-memory cached sparks');
       return cache.sparks;
     }
+    
     console.log('Cache miss: No valid cached sparks found');
     return null;
   },
