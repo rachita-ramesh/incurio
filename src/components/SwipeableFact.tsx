@@ -186,18 +186,27 @@ export const SwipeableSpark: React.FC<SwipeableSparkProps> = ({
             borderTopColor: theme.cardBorder,
             backgroundColor: theme.surface
           }]}>
-            <View style={styles.instructionRow}>
+            <TouchableOpacity 
+              style={styles.instructionRow}
+              onPress={onSwipeLeft}
+            >
               <Text style={[styles.instructionIcon, { color: theme.primary }]}>←</Text>
               <Text style={[styles.instructionText, { color: theme.text.primary }]}>meh 😒</Text>
-            </View>
-            <View style={styles.instructionRow}>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.instructionRow}
+              onPress={onSwipeUp}
+            >
               <Text style={[styles.instructionIcon, { color: theme.primary }]}>↑</Text>
               <Text style={[styles.instructionText, { color: theme.text.primary }]}>woah! 🤯</Text>
-            </View>
-            <View style={styles.instructionRow}>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.instructionRow}
+              onPress={onSwipeRight}
+            >
               <Text style={[styles.instructionIcon, { color: theme.primary }]}>→</Text>
               <Text style={[styles.instructionText, { color: theme.text.primary }]}>nice 😎</Text>
-            </View>
+            </TouchableOpacity>
           </View>
         </Animated.View>
       </PanGestureHandler>
