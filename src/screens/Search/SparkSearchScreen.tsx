@@ -18,6 +18,7 @@ import { SparkDetailModal } from '../../components/SparkDetailModal';
 import { useDebounce } from '../../hooks/useDebounce';
 import { useTheme } from '../../theme/ThemeContext';
 import { useNavigation } from '@react-navigation/native';
+import { formatLocalDate } from '../../utils/dateUtils';
 
 const RECENT_SEARCHES_KEY = 'recent_searches';
 const MAX_RECENT_SEARCHES = 3;
@@ -381,7 +382,7 @@ export const SparkSearchScreen = () => {
                 {item.content}
               </Text>
               <Text style={[styles.sparkDate, { color: theme.text.secondary }]}>
-                {new Date(item.created_at).toLocaleDateString()}
+                {formatLocalDate(item.created_at)}
               </Text>
             </TouchableOpacity>
           )}

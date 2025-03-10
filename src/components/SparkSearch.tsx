@@ -11,6 +11,7 @@ import {
 import { supabaseApi } from '../api/supabase';
 import { useDebounce } from '../hooks/useDebounce';
 import { useTheme } from '../theme/ThemeContext';
+import { formatLocalDate } from '../utils/dateUtils';
 
 interface Spark {
   id: string;
@@ -83,7 +84,7 @@ export const SparkSearch: React.FC<SparkSearchProps> = ({ userId, onSparkSelect 
         {item.content}
       </Text>
       <Text style={[styles.sparkDate, { color: theme.text.secondary }]}>
-        {new Date(item.created_at).toLocaleDateString()}
+        {formatLocalDate(item.created_at)}
       </Text>
     </TouchableOpacity>
   );

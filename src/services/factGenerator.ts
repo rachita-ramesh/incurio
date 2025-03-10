@@ -29,7 +29,18 @@ interface DailySpark {
  */
 function getLocalDateString(date?: Date): string {
   const targetDate = date || new Date();
-  return targetDate.toISOString().split('T')[0];
+  // Format date using local components
+  const year = targetDate.getFullYear();
+  const month = String(targetDate.getMonth() + 1).padStart(2, '0'); // +1 because months are 0-indexed
+  const day = String(targetDate.getDate()).padStart(2, '0');
+  const dateString = `${year}-${month}-${day}`;
+
+  console.log('=== Getting Local Date String ===');
+  console.log('Input date:', date ? date.toLocaleString() : 'No date provided (using now)');
+  console.log('Target date local:', targetDate.toLocaleString());
+  console.log('Local components:', { year, month, day });
+  console.log('Formatted date string:', dateString);
+  return dateString;
 }
 
 export const sparkGeneratorService = {
@@ -108,12 +119,17 @@ export const sparkGeneratorService = {
     try {
       console.log('=== Spark Generation Debug ===');
       const now = new Date();
+      console.log('Current time:', now.toISOString());
+      console.log('Current local time:', now.toLocaleTimeString());
       const today = getLocalDateString();
 
       // Check if it's past 9 AM
       const currentTimeInHours = now.getHours() + now.getMinutes() / 60;
+      console.log('Current time in hours:', currentTimeInHours);
+      console.log('Spark time threshold:', SPARK_TIME);
       if (currentTimeInHours < SPARK_TIME) {
         console.log('Too early for sparks - wait until 9 AM');
+        console.log('Hours until available:', SPARK_TIME - currentTimeInHours);
         return null;
       }
 
@@ -135,8 +151,12 @@ export const sparkGeneratorService = {
           const spark = existingSparks[i];
           try {
             const interactionKey = `${SPARK_INTERACTION_KEY}_${userId}_${today}_${i + 1}`;
+            console.log('=== Checking Spark Interaction ===');
+            console.log('Checking interaction for spark:', { sparkIndex: i + 1, interactionKey });
             const hasInteraction = await AsyncStorage.getItem(interactionKey);
+            console.log('Interaction check result:', hasInteraction ? 'Interacted' : 'Not interacted');
             if (!hasInteraction) {
+              console.log('Found uninteracted spark:', { sparkIndex: i + 1, sparkId: spark.id });
               return {
                 ...spark,
                 sparkIndex: i + 1,
@@ -175,19 +195,31 @@ export const sparkGeneratorService = {
     const today = getLocalDateString();
     const userSparkKey = `${DAILY_SPARK_KEY}_${userId}`;
 
+    console.log('=== Checking Sparks Available Today ===');
+    console.log('Checking for user:', userId);
+    
     const storedSparks = await AsyncStorage.getItem(userSparkKey);
+    console.log('Stored sparks found:', storedSparks ? 'Yes' : 'No');
     if (!storedSparks) return false;
 
     const parsedSparks: DailySpark[] = JSON.parse(storedSparks);
+    console.log('Parsed sparks date:', parsedSparks[0]?.date, 'Today:', today);
     if (parsedSparks[0]?.date !== today) return false;
 
     // Check if all sparks have been interacted with
+    console.log('Checking interactions for all sparks...');
     for (let i = 1; i <= TOTAL_DAILY_SPARKS; i++) {
       const interactionKey = `${SPARK_INTERACTION_KEY}_${userId}_${today}_${i}`;
+      console.log('Checking spark:', i, 'Key:', interactionKey);
       const hasInteraction = await AsyncStorage.getItem(interactionKey);
-      if (!hasInteraction) return false;
+      console.log('Spark', i, 'interaction status:', hasInteraction ? 'Interacted' : 'Not interacted');
+      if (!hasInteraction) {
+        console.log('Found uninteracted spark:', i);
+        return false;
+      }
     }
 
+    console.log('All sparks have been interacted with');
     return true;
   },
 
@@ -195,10 +227,16 @@ export const sparkGeneratorService = {
     try {
       const today = getLocalDateString();
       const interactionKey = `${SPARK_INTERACTION_KEY}_${userId}_${today}_${sparkIndex}`;
+      console.log('=== Marking Spark Interaction ===');
+      console.log('Attempting to mark spark as interacted:', { userId, sparkIndex, interactionKey });
       await AsyncStorage.setItem(interactionKey, 'true');
+      console.log('Successfully marked spark as interacted');
+      
+      // Verify the interaction was stored
+      const verifyInteraction = await AsyncStorage.getItem(interactionKey);
+      console.log('Verification - Interaction stored:', verifyInteraction);
     } catch (error) {
       console.error('Error marking spark as interacted:', error);
-      // Don't throw - if we can't mark interaction, user might see same spark again
       console.warn('User might see this spark again due to interaction tracking failure');
     }
   },
@@ -237,12 +275,25 @@ export const sparkGeneratorService = {
     const minutes = Math.round((SPARK_TIME - hours) * 60);
     sparkTime.setHours(hours, minutes, 0, 0);
 
+    console.log('=== Checking Spark Generation Time ===');
+    console.log('Current time:', now.toISOString());
+    console.log('Current local time:', now.toLocaleTimeString());
+    console.log('Target spark time:', sparkTime.toLocaleTimeString());
+    console.log('Hours:', hours, 'Minutes:', minutes);
+    console.log('Should generate new spark:', now >= sparkTime ? 'Yes' : 'No');
+
     // Compare local times to see if it's past spark time
     return now >= sparkTime;
   },
 
   async hasSparkForDate(userId: string, date: Date): Promise<boolean> {
+    console.log('=== Checking Sparks For Date ===');
+    console.log('User:', userId);
+    console.log('Checking date:', date.toISOString());
+    
     const targetDate = getLocalDateString(date);
+    console.log('Formatted target date:', targetDate);
+    
     const { data: sparks, error } = await supabaseApi.getSparksForDate(userId, targetDate);
     
     if (error) {
@@ -250,7 +301,13 @@ export const sparkGeneratorService = {
       return false;
     }
 
-    return sparks && sparks.length > 0;
+    const hasSparkForDate = sparks && sparks.length > 0;
+    console.log('Sparks found for date:', hasSparkForDate ? 'Yes' : 'No');
+    if (hasSparkForDate) {
+      console.log('Number of sparks:', sparks?.length);
+    }
+
+    return hasSparkForDate;
   },
 };
 

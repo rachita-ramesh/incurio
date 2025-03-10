@@ -9,6 +9,7 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
+import { formatLocalDate } from '../utils/dateUtils';
 
 interface Spark {
   id: string;
@@ -74,8 +75,8 @@ export const SparkDetailModal: React.FC<SparkDetailModalProps> = ({
             <View style={[styles.divider, { backgroundColor: theme.divider }]} />
             <Text style={[styles.detailsTitle, { color: theme.primary }]}>DIVE DEEPER</Text>
             <Text style={[styles.details, { color: theme.text.primary }]}>{spark.details}</Text>
-            <Text style={[styles.date, { color: theme.text.secondary }]}>
-              Discovered on {new Date(spark.created_at).toLocaleDateString()}
+            <Text style={[styles.sparkDate, { color: theme.text.secondary }]}>
+              Discovered on {formatLocalDate(spark.created_at)}
             </Text>
           </ScrollView>
         </View>
@@ -157,7 +158,7 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     marginBottom: 24,
   },
-  date: {
+  sparkDate: {
     fontSize: 14,
     color: '#666',
     fontFamily: 'AvenirNext-Regular',

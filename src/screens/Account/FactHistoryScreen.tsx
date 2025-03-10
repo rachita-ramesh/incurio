@@ -12,6 +12,7 @@ import { supabase } from '../../api/supabase';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { SparkDetailModal } from '../../components/SparkDetailModal';
 import { useTheme } from '../../theme/ThemeContext';
+import { formatLocalDate } from '../../utils/dateUtils';
 
 type RootStackParamList = {
   Account: undefined;
@@ -107,7 +108,7 @@ export const FactHistoryScreen: React.FC<Props> = ({ route, navigation }) => {
       </View>
       <Text style={[styles.sparkContent, { color: theme.text.primary }]}>{item.content}</Text>
       <Text style={[styles.sparkDate, { color: theme.text.secondary }]}>
-        {new Date(item.created_at).toLocaleDateString()}
+        {formatLocalDate(item.created_at)}
       </Text>
     </TouchableOpacity>
   );
@@ -153,7 +154,7 @@ export const FactHistoryScreen: React.FC<Props> = ({ route, navigation }) => {
             </View>
             <Text style={[styles.sparkContent, { color: theme.text.primary }]}>{item.content}</Text>
             <Text style={[styles.sparkDate, { color: theme.text.secondary }]}>
-              {new Date(item.created_at).toLocaleDateString()}
+              {formatLocalDate(item.created_at)}
             </Text>
           </TouchableOpacity>
         )}

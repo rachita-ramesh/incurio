@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@env';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { GeneratedRecommendation } from './openai';
+import { TOTAL_DAILY_SPARKS } from '../services/factGenerator';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
@@ -247,18 +248,55 @@ export const supabaseApi = {
   },
 
   async getSparksForDate(userId: string, date: string) {
-    const startOfDay = new Date(date);
+    console.log('=== Getting Sparks For Date ===');
+    console.log('Date input:', date);
+    
+    // Parse the date string (format: YYYY-MM-DD)
+    const [year, month, day] = date.split('-').map(Number);
+    
+    // Create date objects for start and end of the specified date in local time
+    const startOfDay = new Date(year, month - 1, day);  // month is 0-indexed
     startOfDay.setHours(0, 0, 0, 0);
     
-    const endOfDay = new Date(date);
+    const endOfDay = new Date(year, month - 1, day);
     endOfDay.setHours(23, 59, 59, 999);
 
-    // Get sparks created for this date (either created today or pre-generated yesterday)
+    console.log('Input date components:', { year, month, day });
+    console.log('Start of day (local):', startOfDay.toLocaleString());
+    console.log('End of day (local):', endOfDay.toLocaleString());
+    console.log('Start of day (ISO):', startOfDay.toISOString());
+    console.log('End of day (ISO):', endOfDay.toISOString());
+
+    // First, cleanup old sparks that are not curiosity trails
+    await this.cleanupOldSparks(userId);
+
     return await supabase
       .from('sparks')
       .select('*')
       .eq('user_id', userId)
-      .or(`created_at.gte.${startOfDay.toISOString()},created_at.gte.${new Date(startOfDay.getTime() - 24*60*60*1000).toISOString()}`)
-      .lt('created_at', endOfDay.toISOString());
+      .gte('created_at', startOfDay.toISOString())
+      .lt('created_at', endOfDay.toISOString())
+      .eq('is_curiosity_trail', false)
+      .order('created_at', { ascending: true })
+      .limit(TOTAL_DAILY_SPARKS);
+  },
+
+  async cleanupOldSparks(userId: string) {
+    console.log('=== Cleaning Up Old Sparks ===');
+    
+    // Keep only sparks from the last 7 days and curiosity trails
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    sevenDaysAgo.setHours(0, 0, 0, 0);  // Start of day in local time
+
+    console.log('Cleaning up sparks before:', sevenDaysAgo.toLocaleString());
+    console.log('Cutoff date in ISO:', sevenDaysAgo.toISOString());
+
+    return await supabase
+      .from('sparks')
+      .delete()
+      .eq('user_id', userId)
+      .eq('is_curiosity_trail', false)
+      .lt('created_at', sevenDaysAgo.toISOString());
   }
 };
