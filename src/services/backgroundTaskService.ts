@@ -3,23 +3,25 @@ import { sparkGeneratorService } from './factGenerator';
 import { supabase } from '../api/supabase';
 import { notificationService } from './notificationService';
 
-// Generation windows for sparks
+// Generation windows for sparks (in local time)
 const GENERATION_TIMES = {
-  INITIAL: 4, // 4 AM
-  FIRST_RETRY: 5, // 5 AM
-  FINAL_RETRY: 6, // 6 AM
+  INITIAL: 4, // 4 AM local time
+  FIRST_RETRY: 5, // 5 AM local time
+  FINAL_RETRY: 6, // 6 AM local time
 };
 
 class BackgroundTaskService {
+  private lastGenerationAttempt: Date | null = null;
+
   async configure() {
     try {
-      // Configure background fetch to run hourly
+      // Configure background fetch to run every 15 minutes
       const status = await BackgroundFetch.configure({
-        minimumFetchInterval: 60, // Run hourly to check for generation windows
+        minimumFetchInterval: 15, // Run every 15 minutes to ensure we don't miss generation windows
         stopOnTerminate: false,   // Continue background task when app is terminated
         startOnBoot: true,        // Run background task when device is rebooted
         enableHeadless: true,     // Enable background processing
-        forceAlarmManager: false, // More precise timing on Android
+        forceAlarmManager: true,  // More precise timing on Android
         requiredNetworkType: BackgroundFetch.NETWORK_TYPE_ANY, // Require network connectivity
       }, this.onBackgroundFetch, this.onBackgroundFetchTimeout);
 
@@ -29,20 +31,47 @@ class BackgroundTaskService {
     }
   }
 
-  private isGenerationWindow(): { shouldRun: boolean, isRetry: boolean } {
+  private isGenerationWindow(): { shouldRun: boolean, isRetry: boolean, windowType: 'INITIAL' | 'FIRST_RETRY' | 'FINAL_RETRY' | null } {
     const now = new Date();
-    const currentHour = now.getHours();
+    const localHour = now.getHours();
+    const localMinutes = now.getMinutes();
+
+    // Convert current time to a decimal hour for easier comparison
+    const currentTimeDecimal = localHour + (localMinutes / 60);
+
+    // Check if we're in any of the generation windows
+    // Allow a 45-minute window for each generation time to account for potential delays
+    const isInitialWindow = Math.abs(currentTimeDecimal - GENERATION_TIMES.INITIAL) <= 0.75;
+    const isFirstRetryWindow = Math.abs(currentTimeDecimal - GENERATION_TIMES.FIRST_RETRY) <= 0.75;
+    const isFinalRetryWindow = Math.abs(currentTimeDecimal - GENERATION_TIMES.FINAL_RETRY) <= 0.75;
+
+    // Determine which window we're in
+    let windowType: 'INITIAL' | 'FIRST_RETRY' | 'FINAL_RETRY' | null = null;
+    if (isInitialWindow) windowType = 'INITIAL';
+    else if (isFirstRetryWindow) windowType = 'FIRST_RETRY';
+    else if (isFinalRetryWindow) windowType = 'FINAL_RETRY';
+
+    // Check if we've already attempted generation in this window
+    const shouldSkip = this.lastGenerationAttempt && 
+      this.lastGenerationAttempt.getDate() === now.getDate() &&
+      Math.abs(this.lastGenerationAttempt.getHours() - localHour) < 1;
 
     return {
-      shouldRun: [GENERATION_TIMES.INITIAL, GENERATION_TIMES.FIRST_RETRY, GENERATION_TIMES.FINAL_RETRY].includes(currentHour),
-      isRetry: currentHour === GENERATION_TIMES.FIRST_RETRY || currentHour === GENERATION_TIMES.FINAL_RETRY
+      shouldRun: (isInitialWindow || isFirstRetryWindow || isFinalRetryWindow) && !shouldSkip,
+      isRetry: isFirstRetryWindow || isFinalRetryWindow,
+      windowType
     };
   }
 
   private async generateSparksForAllUsers(isRetry: boolean = false) {
+    const now = new Date();
     console.log(`[BackgroundTaskService] Starting ${isRetry ? 'retry' : 'initial'} spark generation for all users`);
+    console.log(`[BackgroundTaskService] Local time: ${now.toLocaleString()}`);
     
     try {
+      // Update last generation attempt
+      this.lastGenerationAttempt = now;
+
       // Fetch all active users
       const { data: users, error: usersError } = await supabase
         .from('users')
@@ -57,6 +86,11 @@ class BackgroundTaskService {
 
       console.log(`[BackgroundTaskService] Found ${users.length} users for processing`);
 
+      // Get tomorrow's date in local time
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+
       // Process each user sequentially
       for (const user of users) {
         try {
@@ -65,7 +99,7 @@ class BackgroundTaskService {
           // Check if user already has sparks for tomorrow
           const hasSparkForTomorrow = await sparkGeneratorService.hasSparkForDate(
             user.id,
-            new Date(Date.now() + 24 * 60 * 60 * 1000)
+            tomorrow
           );
 
           if (!hasSparkForTomorrow || isRetry) {
@@ -96,14 +130,16 @@ class BackgroundTaskService {
 
   private onBackgroundFetch = async (taskId: string) => {
     console.log('[BackgroundTaskService] onBackgroundFetch start:', taskId);
+    console.log('[BackgroundTaskService] Current local time:', new Date().toLocaleString());
     
     try {
-      const { shouldRun, isRetry } = this.isGenerationWindow();
+      const { shouldRun, isRetry, windowType } = this.isGenerationWindow();
       
       if (shouldRun) {
+        console.log(`[BackgroundTaskService] Running in ${windowType} window`);
         await this.generateSparksForAllUsers(isRetry);
       } else {
-        console.log('[BackgroundTaskService] Not in a generation window, skipping');
+        console.log('[BackgroundTaskService] Not in a generation window or already attempted, skipping');
       }
 
       // Signal completion of background task

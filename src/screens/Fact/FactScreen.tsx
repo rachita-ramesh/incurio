@@ -8,7 +8,7 @@ import {
   SafeAreaView,
   Alert,
 } from 'react-native';
-import { sparkGeneratorService, DAILY_SPARK_KEY, SPARK_TIME } from '../../services/factGenerator';
+import { sparkGeneratorService, DAILY_SPARK_KEY } from '../../services/factGenerator';
 import { supabase } from '../../api/supabase';
 import { supabaseApi } from '../../api/supabase';
 import { generateRecommendation, type GeneratedRecommendation } from '../../api/openai';
@@ -41,20 +41,51 @@ interface Spark {
   sparkIndex: number;
 }
 
+// Constants for spark availability
+const SPARK_AVAILABILITY = {
+  START_HOUR: 4, // 4 AM
+  END_HOUR: 23, // 11 PM
+};
+
+interface RecommendationModalState {
+  visible: boolean;
+  topic: string;
+  milestone: number;
+  recommendation: GeneratedRecommendation & { id: string };
+}
+
 export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
-  const { selectedTopics } = route.params;
-  const [spark, setSpark] = useState<Spark | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [sparkConsumed, setSparkConsumed] = useState(false);
-  const { user } = useUser();
   const { theme } = useTheme();
-  const [recommendationModal, setRecommendationModal] = useState<{
-    visible: boolean;
-    topic: string;
-    milestone: number;
-    recommendation: GeneratedRecommendation & { id: string };
-  } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [spark, setSpark] = useState<Spark | null>(null);
+  const [sparkConsumed, setSparkConsumed] = useState(false);
+  const [recommendationModal, setRecommendationModal] = useState<RecommendationModalState | null>(null);
+  const selectedTopics = route.params?.selectedTopics || [];
+  const [userPreferences, setUserPreferences] = useState<string[]>([]);
+  const { user } = useUser();
+
+  useEffect(() => {
+    loadUserPreferences();
+  }, []);
+
+  const loadUserPreferences = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: userData, error } = await supabase
+        .from('users')
+        .select('preferences')
+        .eq('id', user.id)
+        .single();
+
+      if (error) throw error;
+      setUserPreferences(userData?.preferences || []);
+    } catch (error) {
+      console.error('Error loading user preferences:', error);
+    }
+  };
 
   useEffect(() => {
     navigation.setOptions({
@@ -77,19 +108,6 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
-
-      // Get user preferences from database
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('preferences')
-        .eq('id', user.id)
-        .single();
-
-      if (userError) {
-        console.error('Error fetching user preferences:', userError);
-      }
-
-      const userPreferences = userData?.preferences || [];
 
       // Get today's spark without forcing regeneration
       const newSpark = await sparkGeneratorService.getTodaysSpark(
@@ -140,19 +158,6 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
       console.log('User:', user.id);
       console.log('Spark:', spark.id);
       console.log('Topic:', spark.topic);
-
-      // Get user preferences from database
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('preferences')
-        .eq('id', user.id)
-        .single();
-
-      if (userError) {
-        console.error('Error fetching user preferences:', userError);
-      }
-
-      const userPreferences = userData?.preferences || [];
 
       // Mark current spark as interacted
       await sparkGeneratorService.markSparkAsInteracted(user.id, spark.sparkIndex);
@@ -306,6 +311,36 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
     }
   };
 
+  const checkSparkAvailability = () => {
+    const now = new Date();
+    const currentHour = now.getHours();
+    
+    // Sparks are available from 4 AM to 11 PM
+    return currentHour >= SPARK_AVAILABILITY.START_HOUR;
+  };
+
+  const handleRefresh = async () => {
+    try {
+      setLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      const spark = await sparkGeneratorService.getTodaysSpark(
+        user.id,
+        selectedTopics,
+        JSON.stringify(userPreferences)
+      );
+      setSpark(spark);
+      setSparkConsumed(!spark);
+      setError(null);
+    } catch (error) {
+      console.error('Error refreshing spark:', error);
+      setError('Failed to refresh your spark. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -323,53 +358,53 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
     return <SparkConsumedScreen />;
   }
 
-  if (error) {
-    const now = new Date();
-    const hours = Math.floor(SPARK_TIME);
-    const minutes = Math.round((SPARK_TIME - hours) * 60);
-    const timeString = `${hours % 12 || 12}:${minutes.toString().padStart(2, '0')} ${hours >= 12 ? 'PM' : 'AM'}`;
-    
-    const errorMessage = now.getHours() < SPARK_TIME
-      ? `Today's spark will be ready at ${timeString}`
-      : error;
-
-    return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-        <View style={styles.errorContainer}>
-          <Text style={[styles.errorText, { color: theme.text.primary }]}>
-            {errorMessage}
-          </Text>
-          <View style={styles.buttonContainer}>
-            {now.getHours() >= SPARK_TIME && (
-              <TouchableOpacity style={styles.retryButton} onPress={loadSpark}>
-                <Text style={styles.retryButtonText}>Try Again</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  const errorMessage = !checkSparkAvailability()
+    ? `Your daily sparks will be available at ${SPARK_AVAILABILITY.START_HOUR}:00 AM`
+    : 'No sparks available. Please try again later.';
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      {spark && (
-        <SwipeableSpark
-          spark={spark}
-          onSwipeLeft={handleSwipeLeft}
-          onSwipeRight={handleSwipeRight}
-          onSwipeUp={handleSwipeUp}
-        />
-      )}
-      
-      {recommendationModal && (
-        <RecommendationModal
-          visible={recommendationModal.visible}
-          onClose={() => setRecommendationModal(null)}
-          topic={recommendationModal.topic}
-          milestone={recommendationModal.milestone}
-          recommendation={recommendationModal.recommendation}
-        />
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.primary} />
+        </View>
+      ) : error ? (
+        <View style={styles.errorContainer}>
+          <Text style={[styles.errorText, { color: theme.text.primary }]}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={handleRefresh}>
+            <Text style={styles.retryButtonText}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      ) : sparkConsumed ? (
+        <View style={styles.consumedContainer}>
+          <Text style={[styles.consumedText, { color: theme.text.primary }]}>
+            You've seen all your sparks for today!
+          </Text>
+          <TouchableOpacity style={styles.refreshButton} onPress={handleRefresh}>
+            <Text style={styles.refreshButtonText}>Check Again</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <>
+          {checkSparkAvailability() && spark && (
+            <SwipeableSpark
+              spark={spark}
+              onSwipeLeft={handleSwipeLeft}
+              onSwipeRight={handleSwipeRight}
+              onSwipeUp={handleSwipeUp}
+            />
+          )}
+          
+          {recommendationModal && (
+            <RecommendationModal
+              visible={recommendationModal.visible}
+              onClose={() => setRecommendationModal(null)}
+              topic={recommendationModal.topic}
+              milestone={recommendationModal.milestone}
+              recommendation={recommendationModal.recommendation}
+            />
+          )}
+        </>
       )}
     </SafeAreaView>
   );
@@ -421,5 +456,27 @@ const styles = StyleSheet.create({
     buttonContainer: {
     alignItems: 'center',
     marginTop: 16,
+  },
+  consumedContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  consumedText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 16,
+    fontFamily: 'AvenirNext-Regular',
+  },
+  refreshButton: {
+    backgroundColor: '#6B4EFF',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+  },
+  refreshButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'AvenirNext-Medium',
   },
 }); 

@@ -9,9 +9,6 @@ export const SPARK_INTERACTION_KEY = 'spark_interaction';
 export const TOTAL_DAILY_SPARKS = 7;
 const VARIETY_PROBABILITY = 0.2; // 20% chance to show spark from non-preferred topics
 
-// Set spark generation time to 9:00 AM for testing
-export const SPARK_TIME = 9.0; // 9:00 AM
-
 interface DailySpark {
   id: string;
   content: string;
@@ -23,24 +20,24 @@ interface DailySpark {
   sparkIndex: number;  // Index of the spark (1-7)
 }
 
-/**
- * Returns a string in YYYY-MM-DD format for a given date
- * If no date is provided, returns today's date
- */
-function getLocalDateString(date?: Date): string {
-  const targetDate = date || new Date();
-  // Format date using local components
-  const year = targetDate.getFullYear();
-  const month = String(targetDate.getMonth() + 1).padStart(2, '0'); // +1 because months are 0-indexed
-  const day = String(targetDate.getDate()).padStart(2, '0');
-  const dateString = `${year}-${month}-${day}`;
+// Helper function for consistent date handling
+function getLocalDateString(date: Date = new Date()): string {
+  return date.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
+}
 
-  console.log('=== Getting Local Date String ===');
-  console.log('Input date:', date ? date.toLocaleString() : 'No date provided (using now)');
-  console.log('Target date local:', targetDate.toLocaleString());
-  console.log('Local components:', { year, month, day });
-  console.log('Formatted date string:', dateString);
-  return dateString;
+function getUTCStartEndOfDay(localDate: string): { start: Date, end: Date } {
+  // Parse the local date string
+  const [month, day, year] = localDate.split('/').map(Number);
+  
+  // Create Date objects for start and end of the local day
+  const startLocal = new Date(year, month - 1, day, 0, 0, 0);
+  const endLocal = new Date(year, month - 1, day, 23, 59, 59, 999);
+  
+  // Convert to UTC
+  const startUTC = new Date(startLocal.toUTCString());
+  const endUTC = new Date(endLocal.toUTCString());
+  
+  return { start: startUTC, end: endUTC };
 }
 
 export const sparkGeneratorService = {
@@ -71,6 +68,10 @@ export const sparkGeneratorService = {
     const today = getLocalDateString();
     const sparks: DailySpark[] = [];
 
+    console.log('=== Generating Daily Sparks ===');
+    console.log('Local date:', today);
+    console.log('User:', userId);
+
     // Generate sparks
     for (let i = 0; i < TOTAL_DAILY_SPARKS; i++) {
       const topicsForGeneration = this.selectTopicsWithBandit(selectedTopics);
@@ -78,11 +79,12 @@ export const sparkGeneratorService = {
       console.log(`Generating spark ${i + 1} of ${TOTAL_DAILY_SPARKS} for topics:`, topicsForGeneration);
       const generatedSpark = await generateSpark(topicsForGeneration, userPreferences);
 
-      // Save to Supabase
+      // Save to Supabase with local date information
       const { data: savedSpark, error } = await supabaseApi.saveSpark({
         content: generatedSpark.content,
         topic: generatedSpark.topic,
-        details: generatedSpark.details
+        details: generatedSpark.details,
+        local_date: today
       }, userId);
 
       if (error || !savedSpark || savedSpark.length === 0) {
@@ -117,25 +119,21 @@ export const sparkGeneratorService = {
     userPreferences: string
   ) {
     try {
-      console.log('=== Spark Generation Debug ===');
+      console.log('=== Getting Today\'s Spark ===');
       const now = new Date();
-      console.log('Current time:', now.toISOString());
-      console.log('Current local time:', now.toLocaleTimeString());
-      const today = getLocalDateString();
+      const today = getLocalDateString(now);
+      console.log('Current time:', now.toLocaleString());
+      console.log('Local date:', today);
 
-      // Check if it's past 9 AM
-      const currentTimeInHours = now.getHours() + now.getMinutes() / 60;
-      console.log('Current time in hours:', currentTimeInHours);
-      console.log('Spark time threshold:', SPARK_TIME);
-      if (currentTimeInHours < SPARK_TIME) {
-        console.log('Too early for sparks - wait until 9 AM');
-        console.log('Hours until available:', SPARK_TIME - currentTimeInHours);
-        return null;
-      }
-
-      // Check Supabase for today's sparks
-      console.log('Checking Supabase for existing sparks');
-      const { data: existingSparks, error: sparksError } = await supabaseApi.getSparksForDate(userId, today);
+      // Check Supabase for today's sparks using date range
+      const { start, end } = getUTCStartEndOfDay(today);
+      console.log('Checking Supabase for sparks between:', start.toISOString(), 'and', end.toISOString());
+      
+      const { data: existingSparks, error: sparksError } = await supabaseApi.getSparksForDateRange(
+        userId,
+        start.toISOString(),
+        end.toISOString()
+      );
       
       if (sparksError) {
         console.error('Error checking Supabase:', sparksError);
@@ -151,10 +149,9 @@ export const sparkGeneratorService = {
           const spark = existingSparks[i];
           try {
             const interactionKey = `${SPARK_INTERACTION_KEY}_${userId}_${today}_${i + 1}`;
-            console.log('=== Checking Spark Interaction ===');
             console.log('Checking interaction for spark:', { sparkIndex: i + 1, interactionKey });
             const hasInteraction = await AsyncStorage.getItem(interactionKey);
-            console.log('Interaction check result:', hasInteraction ? 'Interacted' : 'Not interacted');
+            
             if (!hasInteraction) {
               console.log('Found uninteracted spark:', { sparkIndex: i + 1, sparkId: spark.id });
               return {
@@ -268,24 +265,6 @@ export const sparkGeneratorService = {
     return parsedSpark.date === today;
   },
 
-  async shouldGenerateNewSpark(): Promise<boolean> {
-    const now = new Date();
-    const sparkTime = new Date(now);
-    const hours = Math.floor(SPARK_TIME);
-    const minutes = Math.round((SPARK_TIME - hours) * 60);
-    sparkTime.setHours(hours, minutes, 0, 0);
-
-    console.log('=== Checking Spark Generation Time ===');
-    console.log('Current time:', now.toISOString());
-    console.log('Current local time:', now.toLocaleTimeString());
-    console.log('Target spark time:', sparkTime.toLocaleTimeString());
-    console.log('Hours:', hours, 'Minutes:', minutes);
-    console.log('Should generate new spark:', now >= sparkTime ? 'Yes' : 'No');
-
-    // Compare local times to see if it's past spark time
-    return now >= sparkTime;
-  },
-
   async hasSparkForDate(userId: string, date: Date): Promise<boolean> {
     console.log('=== Checking Sparks For Date ===');
     console.log('User:', userId);
@@ -294,7 +273,16 @@ export const sparkGeneratorService = {
     const targetDate = getLocalDateString(date);
     console.log('Formatted target date:', targetDate);
     
-    const { data: sparks, error } = await supabaseApi.getSparksForDate(userId, targetDate);
+    // Get UTC start and end times for the local date
+    const { start, end } = getUTCStartEndOfDay(targetDate);
+    console.log('UTC range:', { start: start.toISOString(), end: end.toISOString() });
+    
+    // Query Supabase using UTC range
+    const { data: sparks, error } = await supabaseApi.getSparksForDateRange(
+      userId,
+      start.toISOString(),
+      end.toISOString()
+    );
     
     if (error) {
       console.error('Error checking sparks in Supabase:', error);

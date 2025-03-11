@@ -27,6 +27,7 @@ export interface Spark {
   details: string;
   created_at: string;
   user_id: string;
+  local_date?: string;  // Optional field for local date tracking
 }
 
 export interface UserInteraction {
@@ -52,6 +53,7 @@ export const supabaseApi = {
         content: spark.content,
         topic: spark.topic,
         details: spark.details,
+        local_date: spark.local_date,
         user_id: userId
       }])
       .select();
@@ -247,12 +249,31 @@ export const supabaseApi = {
     return transformedData;
   },
 
-  async getSparksForDate(userId: string, date: string) {
-    console.log('=== Getting Sparks For Date ===');
-    console.log('Date input:', date);
+  async getSparksForDateRange(userId: string, startDate: string, endDate: string) {
+    console.log('=== Getting Sparks For Date Range ===');
+    console.log('Start date:', startDate);
+    console.log('End date:', endDate);
     
-    // Parse the date string (format: YYYY-MM-DD)
-    const [year, month, day] = date.split('-').map(Number);
+    // First, cleanup old sparks that are not curiosity trails
+    await this.cleanupOldSparks(userId);
+
+    return await supabase
+      .from('sparks')
+      .select('*')
+      .eq('user_id', userId)
+      .gte('created_at', startDate)
+      .lt('created_at', endDate)
+      .eq('is_curiosity_trail', false)
+      .order('created_at', { ascending: true })
+      .limit(TOTAL_DAILY_SPARKS);
+  },
+
+  async getSparksForDate(userId: string, date: string) {
+    console.log('=== Getting Sparks For Date (Legacy) ===');
+    console.log('Date:', date);
+    
+    // Parse the date string (expected format: MM/DD/YYYY)
+    const [month, day, year] = date.split('/').map(Number);
     
     // Create date objects for start and end of the specified date in local time
     const startOfDay = new Date(year, month - 1, day);  // month is 0-indexed
@@ -261,24 +282,7 @@ export const supabaseApi = {
     const endOfDay = new Date(year, month - 1, day);
     endOfDay.setHours(23, 59, 59, 999);
 
-    console.log('Input date components:', { year, month, day });
-    console.log('Start of day (local):', startOfDay.toLocaleString());
-    console.log('End of day (local):', endOfDay.toLocaleString());
-    console.log('Start of day (ISO):', startOfDay.toISOString());
-    console.log('End of day (ISO):', endOfDay.toISOString());
-
-    // First, cleanup old sparks that are not curiosity trails
-    await this.cleanupOldSparks(userId);
-
-    return await supabase
-      .from('sparks')
-      .select('*')
-      .eq('user_id', userId)
-      .gte('created_at', startOfDay.toISOString())
-      .lt('created_at', endOfDay.toISOString())
-      .eq('is_curiosity_trail', false)
-      .order('created_at', { ascending: true })
-      .limit(TOTAL_DAILY_SPARKS);
+    return this.getSparksForDateRange(userId, startOfDay.toISOString(), endOfDay.toISOString());
   },
 
   async cleanupOldSparks(userId: string) {

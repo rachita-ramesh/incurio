@@ -1,12 +1,11 @@
 import PushNotification, { Importance } from 'react-native-push-notification';
 import PushNotificationIOS, { PushNotificationPermissions } from '@react-native-community/push-notification-ios';
-import { SPARK_TIME } from './factGenerator';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Define notification time constant
 const NOTIFICATION_TIME = {
-  HOURS: 9,
-  MINUTES: 30
+  HOURS: 4, // 4 AM local time
+  MINUTES: 0
 };
 
 class NotificationService {
@@ -107,7 +106,7 @@ class NotificationService {
     const now = new Date();
     const nextNotification = new Date();
     
-    // Set to 9:30 AM
+    // Set to notification time (4 AM by default)
     nextNotification.setHours(NOTIFICATION_TIME.HOURS, NOTIFICATION_TIME.MINUTES, 0, 0);
     
     console.log('Notification time calculation:', {
