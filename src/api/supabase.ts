@@ -256,15 +256,32 @@ export const supabaseApi = {
     // First, cleanup old sparks that are not curiosity trails
     await this.cleanupOldSparks(userId);
 
-    return await supabase
-      .from('sparks')
-      .select('*')
-      .eq('user_id', userId)
-      .gte('created_at', startDate)
-      .lt('created_at', endDate)
-      .eq('is_curiosity_trail', false)
-      .order('created_at', { ascending: true })
-      .limit(TOTAL_DAILY_SPARKS);
+    try {
+      const { data: sparks, error } = await supabase
+        .from('sparks')
+        .select('*')
+        .eq('user_id', userId)
+        .gte('created_at', startDate)
+        .lt('created_at', endDate)
+        .eq('is_curiosity_trail', false)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching sparks:', error);
+        throw error;
+      }
+
+      // Check if we have a complete set of sparks
+      const incomplete = !sparks || sparks.length < TOTAL_DAILY_SPARKS;
+      if (incomplete) {
+        console.log(`Found incomplete set of sparks: ${sparks?.length || 0}/${TOTAL_DAILY_SPARKS}`);
+      }
+
+      return { data: sparks || [], incomplete };
+    } catch (error) {
+      console.error('Error in getSparksForDateRange:', error);
+      throw error;
+    }
   },
 
   async getSparksForDate(userId: string, date: string) {

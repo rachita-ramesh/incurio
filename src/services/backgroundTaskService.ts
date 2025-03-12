@@ -86,7 +86,8 @@ class BackgroundTaskService {
 
       console.log(`[BackgroundTaskService] Found ${users.length} users for processing`);
 
-      // Get tomorrow's date in local time
+      // Get today's and tomorrow's date in local time
+      const today = new Date();
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
       tomorrow.setHours(0, 0, 0, 0);
@@ -96,27 +97,41 @@ class BackgroundTaskService {
         try {
           console.log(`[BackgroundTaskService] Processing user: ${user.id}`);
           
-          // Check if user already has sparks for tomorrow
+          // Check if user has sparks for today
+          const hasSparkForToday = await sparkGeneratorService.hasSparkForDate(
+            user.id,
+            today
+          );
+
+          // Check if user has sparks for tomorrow
           const hasSparkForTomorrow = await sparkGeneratorService.hasSparkForDate(
             user.id,
             tomorrow
           );
 
-          if (!hasSparkForTomorrow || isRetry) {
-            // Generate sparks for tomorrow
+          // Generate today's sparks if needed (during first window only)
+          if (!hasSparkForToday && !isRetry) {
+            console.log(`[BackgroundTaskService] Generating today's sparks for user: ${user.id}`);
             await sparkGeneratorService.generateDailySpark(
               user.id,
               user.preferences || [],
               'Prefer concise, interesting sparks that are easy to understand and ignite curiosity.'
             );
-            
-            // Schedule notification for this user
-            await notificationService.scheduleDailyNotification();
-            
-            console.log(`[BackgroundTaskService] Successfully generated sparks for user: ${user.id}`);
-          } else {
-            console.log(`[BackgroundTaskService] Sparks already exist for user: ${user.id}`);
           }
+
+          // Generate tomorrow's sparks if needed
+          if (!hasSparkForTomorrow || isRetry) {
+            console.log(`[BackgroundTaskService] Generating tomorrow's sparks for user: ${user.id}`);
+            await sparkGeneratorService.generateDailySpark(
+              user.id,
+              user.preferences || [],
+              'Prefer concise, interesting sparks that are easy to understand and ignite curiosity.'
+            );
+          }
+            
+          // Schedule notification for this user
+          await notificationService.scheduleDailyNotification();
+          console.log(`[BackgroundTaskService] Successfully processed user: ${user.id}`);
         } catch (error) {
           console.error(`[BackgroundTaskService] Error generating sparks for user ${user.id}:`, error);
           // Individual user errors don't stop the batch - continue with next user

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   SafeAreaView,
   Alert,
+  AppState,
+  AppStateStatus,
 } from 'react-native';
 import { sparkGeneratorService, DAILY_SPARK_KEY } from '../../services/factGenerator';
 import { supabase } from '../../api/supabase';
@@ -15,7 +17,6 @@ import { generateRecommendation, type GeneratedRecommendation } from '../../api/
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { SwipeableSpark } from '../../components/SwipeableFact';
 import { SparkConsumedScreen } from '../../components/SparkConsumedScreen';
-import { useFocusEffect } from '@react-navigation/native';
 import { notificationService } from '../../services/notificationService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../theme/ThemeContext';
@@ -64,10 +65,34 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
   const selectedTopics = route.params?.selectedTopics || [];
   const [userPreferences, setUserPreferences] = useState<string[]>([]);
   const { user } = useUser();
+  const appState = useRef(AppState.currentState);
+  const isLoadingRef = useRef(false);
 
   useEffect(() => {
     loadUserPreferences();
+    // Initial load when component mounts
+    loadSpark();
   }, []);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  const handleAppStateChange = async (nextAppState: AppStateStatus) => {
+    if (
+      appState.current.match(/inactive|background/) &&
+      nextAppState === 'active'
+    ) {
+      console.log('App has come to the foreground!');
+      await loadSpark();
+    }
+
+    appState.current = nextAppState;
+  };
 
   const loadUserPreferences = async () => {
     try {
@@ -102,7 +127,14 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
   }, [navigation]);
 
   const loadSpark = async () => {
+    // Prevent multiple simultaneous loads
+    if (isLoadingRef.current) {
+      console.log('Already loading sparks, skipping...');
+      return;
+    }
+
     try {
+      isLoadingRef.current = true;
       setLoading(true);
       setError(null);
 
@@ -128,16 +160,9 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
       setError(`Error loading spark: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setLoading(false);
+      isLoadingRef.current = false;
     }
   };
-
-  useFocusEffect(
-    React.useCallback(() => {
-      if (!sparkConsumed && !spark) {
-        loadSpark();
-      }
-    }, [selectedTopics, sparkConsumed, spark])
-  );
 
   const handleSignOut = async () => {
     try {

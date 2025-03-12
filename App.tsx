@@ -74,8 +74,9 @@ function AppContent(): React.JSX.Element {
       try {
         console.log('=== Starting App Setup ===');
         
-        // Initialize background task service
+        // Initialize and start background task service
         await backgroundTaskService.configure();
+        await backgroundTaskService.startBackgroundFetch();
         
         // Get initial session and user data
         const { data: { session: initialSession }, error: sessionError } = await supabase.auth.getSession();
