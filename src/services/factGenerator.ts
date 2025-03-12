@@ -79,12 +79,11 @@ export const sparkGeneratorService = {
       console.log(`Generating spark ${i + 1} of ${TOTAL_DAILY_SPARKS} for topics:`, topicsForGeneration);
       const generatedSpark = await generateSpark(topicsForGeneration, userPreferences);
 
-      // Save to Supabase with local date information
+      // Save to Supabase
       const { data: savedSpark, error } = await supabaseApi.saveSpark({
         content: generatedSpark.content,
         topic: generatedSpark.topic,
-        details: generatedSpark.details,
-        local_date: today
+        details: generatedSpark.details
       }, userId);
 
       if (error || !savedSpark || savedSpark.length === 0) {

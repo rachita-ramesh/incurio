@@ -53,7 +53,6 @@ export const supabaseApi = {
         content: spark.content,
         topic: spark.topic,
         details: spark.details,
-        local_date: spark.local_date,
         user_id: userId
       }])
       .select();
