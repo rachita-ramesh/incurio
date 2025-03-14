@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Define notification time constant
 const NOTIFICATION_TIME = {
-  HOURS: 4, // 4 AM local time
+  HOURS: 20, // 8 PM local time
   MINUTES: 0
 };
 
