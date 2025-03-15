@@ -40,7 +40,18 @@ interface Spark {
   topic: string;
   details: string;
   sparkIndex: number;
+  created_at?: string;  // Optional since we might not always have it
 }
+
+// Helper to convert DailySpark to Spark
+const convertToSpark = (dailySpark: any): Spark => ({
+  id: dailySpark.id,
+  content: dailySpark.content,
+  topic: dailySpark.topic,
+  details: dailySpark.details,
+  sparkIndex: dailySpark.sparkIndex,
+  created_at: dailySpark.generatedAt
+});
 
 // Constants for spark availability
 const SPARK_AVAILABILITY = {
@@ -55,6 +66,52 @@ interface RecommendationModalState {
   recommendation: GeneratedRecommendation & { id: string };
 }
 
+// Helper function to get uninteracted sparks count
+const getUninteractedSparksCount = async (userId: string): Promise<number> => {
+  try {
+    // Get today's date range in UTC
+    const now = new Date();
+    const startOfDay = new Date(now);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(now);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    // First get all sparks for today
+    const { data: todaySparks, error: sparksError } = await supabase
+      .from('sparks')
+      .select('id')
+      .eq('user_id', userId)
+      .gte('created_at', startOfDay.toISOString())
+      .lt('created_at', endOfDay.toISOString());
+
+    if (sparksError) throw sparksError;
+    if (!todaySparks) return 0;
+
+    // Then get all interactions for today's sparks
+    const { data: interactions, error: interactionsError } = await supabase
+      .from('user_interactions')
+      .select('spark_id')
+      .eq('user_id', userId)
+      .in('spark_id', todaySparks.map(spark => spark.id));
+
+    if (interactionsError) throw interactionsError;
+
+    // Calculate uninteracted sparks
+    const interactedSparkIds = new Set(interactions?.map(i => i.spark_id) || []);
+    const uninteractedCount = todaySparks.filter(spark => !interactedSparkIds.has(spark.id)).length;
+
+    console.log('=== Uninteracted Sparks Status ===');
+    console.log(`Total sparks for today: ${todaySparks.length}`);
+    console.log(`Interacted sparks: ${interactedSparkIds.size}`);
+    console.log(`Uninteracted sparks remaining: ${uninteractedCount}`);
+
+    return uninteractedCount;
+  } catch (error) {
+    console.error('Error getting uninteracted sparks count:', error);
+    return 0;
+  }
+};
+
 export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
   const { theme } = useTheme();
   const [loading, setLoading] = useState(false);
@@ -67,6 +124,7 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
   const { user } = useUser();
   const appState = useRef(AppState.currentState);
   const isLoadingRef = useRef(false);
+  const processingInteractionRef = useRef(false); // Reference to track if an interaction is in progress
 
   useEffect(() => {
     loadUserPreferences();
@@ -141,19 +199,92 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      // Get today's spark without forcing regeneration
-      const newSpark = await sparkGeneratorService.getTodaysSpark(
+      // Log uninteracted sparks count before loading
+      const uninteractedCount = await getUninteractedSparksCount(user.id);
+      console.log('Starting loadSpark with', uninteractedCount, 'uninteracted sparks');
+
+      // Get today's date range in UTC
+      const now = new Date();
+      const startOfDay = new Date(now);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(now);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      // First try getting spark through sparkGeneratorService
+      const dailySpark = await sparkGeneratorService.getTodaysSpark(
         user.id,
         selectedTopics,
         'Prefer concise, interesting sparks that are easy to understand and ignite curiosity.'
       );
 
+      let newSpark: Spark | null = dailySpark ? convertToSpark(dailySpark) : null;
+
+      // If no spark returned but we know there are uninteracted sparks, fetch directly from Supabase
+      if (!newSpark && uninteractedCount > 0) {
+        console.log('getTodaysSpark returned null but uninteracted sparks exist, fetching manually...');
+        
+        // Get all sparks for today
+        const { data: todaySparks, error: sparksError } = await supabase
+          .from('sparks')
+          .select('id, content, topic, details, created_at')
+          .eq('user_id', user.id)
+          .gte('created_at', startOfDay.toISOString())
+          .lt('created_at', endOfDay.toISOString());
+
+        if (sparksError) {
+          console.error('Error fetching today\'s sparks:', sparksError);
+          throw sparksError;
+        }
+        
+        if (!todaySparks || todaySparks.length === 0) {
+          console.log('No sparks found for today');
+          return;
+        }
+        
+        console.log(`Found ${todaySparks.length} total sparks for today`);
+
+        // Get all interactions for this user
+        const { data: interactions, error: interactionsError } = await supabase
+          .from('user_interactions')
+          .select('spark_id')
+          .eq('user_id', user.id);
+
+        if (interactionsError) {
+          console.error('Error fetching interactions:', interactionsError);
+          throw interactionsError;
+        }
+
+        // Create a set of interacted spark IDs for quick lookup
+        const interactedIds = new Set(interactions?.map(i => i.spark_id) || []);
+        console.log(`User has interacted with ${interactedIds.size} sparks in total`);
+
+        // Find first uninteracted spark
+        const uninteractedSpark = todaySparks.find(spark => !interactedIds.has(spark.id));
+        
+        if (uninteractedSpark) {
+          console.log('Found uninteracted spark with ID:', uninteractedSpark.id);
+          newSpark = {
+            id: uninteractedSpark.id,
+            content: uninteractedSpark.content,
+            topic: uninteractedSpark.topic,
+            details: uninteractedSpark.details,
+            sparkIndex: 1, // Default to 1 since we're bypassing sparkGeneratorService
+            created_at: uninteractedSpark.created_at
+          };
+        } else {
+          console.log('All sparks have been interacted with');
+        }
+      }
+
       if (newSpark) {
+        console.log('Setting spark:', newSpark.id);
         setSpark(newSpark);
         setSparkConsumed(false);
       } else {
-        // If no spark available, all have been consumed
-        setSparkConsumed(true);
+        // Double check one last time
+        const remainingCount = await getUninteractedSparksCount(user.id);
+        console.log('Final check - Uninteracted sparks remaining:', remainingCount);
+        setSparkConsumed(remainingCount === 0);
       }
     } catch (error) {
       console.error('Error loading spark:', error);
@@ -175,50 +306,141 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
   };
 
   const handleInteraction = async () => {
+    // Prevent multiple simultaneous interactions
+    if (processingInteractionRef.current) {
+      console.log('Already processing an interaction, skipping...');
+      return;
+    }
+
     try {
+      processingInteractionRef.current = true; // Set flag to indicate interaction in progress
+      
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
       if (!spark) throw new Error('No spark available');
-      console.log('=== Processing Love Interaction ===');
+      
+      // Capture current spark to ensure consistency
+      const currentSpark = { ...spark };
+      
+      // Log uninteracted count before interaction
+      const beforeCount = await getUninteractedSparksCount(user.id);
+      console.log('=== Processing Interaction ===');
+      console.log('Uninteracted sparks before:', beforeCount);
       console.log('User:', user.id);
-      console.log('Spark:', spark.id);
-      console.log('Topic:', spark.topic);
+      console.log('Spark:', currentSpark.id);
+      console.log('Topic:', currentSpark.topic);
 
-      // Mark current spark as interacted
-      await sparkGeneratorService.markSparkAsInteracted(user.id, spark.sparkIndex);
+      // Record interaction in Supabase directly (using 'like' instead of 'view')
+      const { error: interactionError } = await supabase
+        .from('user_interactions')
+        .insert([{
+          user_id: user.id,
+          spark_id: currentSpark.id,
+          interaction_type: 'like',
+        }]);
 
-      // Try to get the next uninteracted spark
-      const nextSpark = await sparkGeneratorService.getTodaysSpark(
+      if (interactionError) {
+        console.error('Error recording interaction:', interactionError);
+        throw interactionError;
+      }
+
+      // Mark current spark as interacted in local storage too
+      await sparkGeneratorService.markSparkAsInteracted(user.id, currentSpark.sparkIndex);
+
+      // Try to get the next uninteracted spark via sparkGeneratorService
+      const dailySpark = await sparkGeneratorService.getTodaysSpark(
         user.id,
         selectedTopics,
         JSON.stringify(userPreferences)
       );
 
+      let nextSpark: Spark | null = dailySpark ? convertToSpark(dailySpark) : null;
+
+      // If service returns null, try manual approach
+      if (!nextSpark) {
+        console.log('handleInteraction: Trying manual fetch of next uninteracted spark');
+        
+        // Get today's date range in UTC
+        const now = new Date();
+        const startOfDay = new Date(now);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(now);
+        endOfDay.setHours(23, 59, 59, 999);
+        
+        // Get all sparks for today
+        const { data: todaySparks, error: sparksError } = await supabase
+          .from('sparks')
+          .select('id, content, topic, details, created_at')
+          .eq('user_id', user.id)
+          .gte('created_at', startOfDay.toISOString())
+          .lt('created_at', endOfDay.toISOString());
+
+        if (sparksError) {
+          console.error('Error fetching today\'s sparks after interaction:', sparksError);
+          throw sparksError;
+        }
+        
+        if (todaySparks && todaySparks.length > 0) {
+          // Get all interactions
+          const { data: interactions, error: interactionsError } = await supabase
+            .from('user_interactions')
+            .select('spark_id')
+            .eq('user_id', user.id);
+
+          if (interactionsError) {
+            console.error('Error fetching interactions after interaction:', interactionsError);
+            throw interactionsError;
+          }
+
+          // Find uninteracted sparks (excluding the current one)
+          const interactedIds = new Set(interactions?.map(i => i.spark_id) || []);
+          const uninteractedSpark = todaySparks.find(s => !interactedIds.has(s.id) && s.id !== currentSpark.id);
+          
+          if (uninteractedSpark) {
+            console.log('Found next uninteracted spark with ID:', uninteractedSpark.id);
+            nextSpark = {
+              id: uninteractedSpark.id,
+              content: uninteractedSpark.content,
+              topic: uninteractedSpark.topic,
+              details: uninteractedSpark.details,
+              sparkIndex: currentSpark.sparkIndex + 1,
+              created_at: uninteractedSpark.created_at
+            };
+          }
+        }
+      }
+
+      // Log uninteracted count after interaction
+      const afterCount = await getUninteractedSparksCount(user.id);
+      console.log('Uninteracted sparks after:', afterCount);
+
       if (nextSpark) {
-        // If there's another spark, show it
+        console.log('Setting next spark:', nextSpark.id);
         setSpark(nextSpark);
+        setSparkConsumed(false);
       } else {
-        // If no more sparks, show the consumed screen
+        console.log('No more uninteracted sparks found');
         notificationService.scheduleDailyNotification();
         setSparkConsumed(true);
       }
     } catch (error) {
       console.error('Error handling interaction:', error);
-      // Check if all sparks have been consumed
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          const hasConsumed = await sparkGeneratorService.checkIfSparkAvailableToday(user.id);
-          if (hasConsumed) {
-            notificationService.scheduleDailyNotification();
-            setSparkConsumed(true);
-            return;
-          }
+          const remainingCount = await getUninteractedSparksCount(user.id);
+          console.log('Error recovery - Uninteracted sparks:', remainingCount);
+          setSparkConsumed(remainingCount === 0);
         }
       } catch (checkError) {
         console.error('Error checking spark status:', checkError);
       }
       setError('Failed to process your response. Please try again.');
+    } finally {
+      // Add a small delay before allowing another interaction
+      setTimeout(() => {
+        processingInteractionRef.current = false;
+      }, 300);
     }
   };
 
@@ -228,9 +450,12 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
       if (!user) throw new Error('User not authenticated');
       if (!spark) throw new Error('No spark available');
 
+      // Store the current spark ID to track if it changes during async operations
+      const currentSparkId = spark.id;
+
       console.log('=== Processing Love Interaction ===');
       console.log('User:', user.id);
-      console.log('Spark:', spark.id);
+      console.log('Spark:', currentSparkId);
       console.log('Topic:', spark.topic);
 
       // Save the love interaction
@@ -238,7 +463,7 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
         .from('user_interactions')
         .insert([{
           user_id: user.id,
-          spark_id: spark.id,
+          spark_id: currentSparkId,
           interaction_type: 'love',
         }]);
 
@@ -279,7 +504,13 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
         });
       }
 
-      await handleInteraction();
+      // Check if the current spark is still the one we processed
+      // If state has changed during async operations, don't proceed with handleInteraction
+      if (spark && spark.id === currentSparkId) {
+        await handleInteraction();
+      } else {
+        console.log('Spark changed during love interaction processing, skipping handleInteraction');
+      }
     } catch (error) {
       console.error('Error handling swipe up:', error);
       setError('Failed to process your response. Please try again.');
@@ -292,19 +523,27 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
       if (!user) throw new Error('User not authenticated');
       if (!spark) throw new Error('No spark available');
 
+      // Store current spark ID
+      const currentSparkId = spark.id;
+
       // Save the dislike interaction
       const { error: interactionError } = await supabase
         .from('user_interactions')
         .insert([{
           user_id: user.id,
-          spark_id: spark.id,
+          spark_id: currentSparkId,
           interaction_type: 'dislike',
         }]);
 
       if (interactionError) throw interactionError;
       console.log('Disliked spark:', spark.content);
       
-      await handleInteraction();
+      // Only proceed if spark hasn't changed
+      if (spark && spark.id === currentSparkId) {
+        await handleInteraction();
+      } else {
+        console.log('Spark changed during dislike processing, skipping handleInteraction');
+      }
     } catch (error) {
       console.error('Error handling swipe left:', error);
       setError('Failed to process your response. Please try again.');
@@ -317,19 +556,27 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
       if (!user) throw new Error('User not authenticated');
       if (!spark) throw new Error('No spark available');
 
+      // Store current spark ID
+      const currentSparkId = spark.id;
+
       // Save the like interaction
       const { error: interactionError } = await supabase
         .from('user_interactions')
         .insert([{
           user_id: user.id,
-          spark_id: spark.id,
+          spark_id: currentSparkId,
           interaction_type: 'like',
         }]);
 
       if (interactionError) throw interactionError;
       console.log('Liked spark:', spark.content);
       
-      await handleInteraction();
+      // Only proceed if spark hasn't changed
+      if (spark && spark.id === currentSparkId) {
+        await handleInteraction();
+      } else {
+        console.log('Spark changed during like processing, skipping handleInteraction');
+      }
     } catch (error) {
       console.error('Error handling swipe right:', error);
       setError('Failed to process your response. Please try again.');
@@ -350,13 +597,85 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      const spark = await sparkGeneratorService.getTodaysSpark(
+      // Try to get spark from sparkGeneratorService
+      const dailySpark = await sparkGeneratorService.getTodaysSpark(
         user.id,
         selectedTopics,
         JSON.stringify(userPreferences)
       );
-      setSpark(spark);
-      setSparkConsumed(!spark);
+
+      let newSpark: Spark | null = dailySpark ? convertToSpark(dailySpark) : null;
+
+      // If service returns null, try manual approach
+      if (!newSpark) {
+        console.log('handleRefresh: Trying manual fetch of uninteracted sparks');
+        
+        // Get today's date range in UTC
+        const now = new Date();
+        const startOfDay = new Date(now);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(now);
+        endOfDay.setHours(23, 59, 59, 999);
+        
+        // Get all of today's sparks
+        const { data: todaySparks, error: sparksError } = await supabase
+          .from('sparks')
+          .select('id, content, topic, details, created_at')
+          .eq('user_id', user.id)
+          .gte('created_at', startOfDay.toISOString())
+          .lt('created_at', endOfDay.toISOString());
+
+        if (sparksError) {
+          console.error('Error fetching today\'s sparks:', sparksError);
+          throw sparksError;
+        }
+        
+        if (todaySparks && todaySparks.length > 0) {
+          console.log(`Refresh found ${todaySparks.length} total sparks for today`);
+          
+          // Get all interactions
+          const { data: interactions, error: interactionsError } = await supabase
+            .from('user_interactions')
+            .select('spark_id')
+            .eq('user_id', user.id);
+
+          if (interactionsError) {
+            console.error('Error fetching interactions:', interactionsError);
+            throw interactionsError;
+          }
+
+          // Find uninteracted sparks
+          const interactedIds = new Set(interactions?.map(i => i.spark_id) || []);
+          console.log(`Refresh: User has interacted with ${interactedIds.size} sparks in total`);
+          
+          const uninteractedSpark = todaySparks.find(spark => !interactedIds.has(spark.id));
+          
+          if (uninteractedSpark) {
+            console.log('Refresh found uninteracted spark with ID:', uninteractedSpark.id);
+            newSpark = {
+              id: uninteractedSpark.id,
+              content: uninteractedSpark.content,
+              topic: uninteractedSpark.topic,
+              details: uninteractedSpark.details,
+              sparkIndex: 1,
+              created_at: uninteractedSpark.created_at
+            };
+          } else {
+            console.log('Refresh: All sparks have been interacted with');
+          }
+        }
+      }
+
+      if (newSpark) {
+        console.log('Setting spark from refresh:', newSpark.id);
+        setSpark(newSpark);
+        setSparkConsumed(false);
+      } else {
+        // One final check
+        const remainingCount = await getUninteractedSparksCount(user.id);
+        console.log('Final refresh check - Uninteracted sparks remaining:', remainingCount);
+        setSparkConsumed(remainingCount === 0);
+      }
       setError(null);
     } catch (error) {
       console.error('Error refreshing spark:', error);

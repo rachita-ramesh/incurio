@@ -38,6 +38,47 @@ export interface UserInteraction {
   created_at: string;
 }
 
+interface PostgrestError {
+  message: string;
+  details: string;
+  hint?: string;
+  code: string;
+  name?: string;
+}
+
+interface SimilarityCheckParams {
+  p_user_id: string;
+  p_topic: string;
+  p_embedding: number[];
+  p_similarity_threshold: number;
+}
+
+interface SimilarityCheckResult {
+  is_too_similar: boolean;
+  similar_spark_id: string;
+  similarity_score: number;
+  content: string;
+}
+
+interface SimilarityScore {
+  content: string;
+  similarity_score: number;
+}
+
+interface CheckAndSaveSparkResult {
+  id: string;
+  similarity_scores: SimilarityScore[];
+}
+
+interface CheckAndSaveSparkParams {
+  p_content: string;
+  p_topic: string;
+  p_details: string;
+  p_user_id: string;
+  p_embedding: number[];
+  p_similarity_threshold: number;
+}
+
 export const supabaseApi = {
   async saveUserPreferences(userId: string, preferences: string[]) {
     return await supabase
@@ -120,7 +161,7 @@ export const supabaseApi = {
     console.log('Last milestone:', lastMilestone);
 
     // Check if we'll hit a new milestone
-    const newMilestone = Math.floor(newCount / 10) * 10;
+    const newMilestone = Math.floor(newCount / 5) * 5;
     const hitNewMilestone = newMilestone > lastMilestone;
 
     if (existingTrail) {
@@ -147,7 +188,9 @@ export const supabaseApi = {
           user_id: userId,
           topic,
           love_count: 1,
-          last_milestone: 0
+          last_milestone: 0,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         }]);
 
       if (insertError) {
@@ -318,5 +361,91 @@ export const supabaseApi = {
       .eq('user_id', userId)
       .eq('is_curiosity_trail', false)
       .lt('created_at', sevenDaysAgo.toISOString());
+  },
+
+  async saveSparkWithEmbedding(
+    spark: Omit<Spark, 'id' | 'created_at' | 'user_id'>,
+    embedding: number[],
+    userId: string
+  ) {
+    console.log('=== Saving Spark with Embedding ===');
+    console.log('User:', userId);
+    console.log('Topic:', spark.topic);
+    console.log('Content:', spark.content);
+    console.log('Content length:', spark.content.length);
+    console.log('Embedding dimensions:', embedding.length);
+    
+    try {
+      const params: CheckAndSaveSparkParams = {
+        p_content: spark.content,
+        p_topic: spark.topic,
+        p_details: spark.details,
+        p_user_id: userId,
+        p_embedding: embedding,
+        p_similarity_threshold: 0.85
+      };
+
+      console.log('Calling check_and_save_spark with params:', {
+        ...params,
+        p_embedding: `[${params.p_embedding.slice(0, 3).join(', ')}...]` // Log just first few values
+      });
+
+      const { data, error } = await supabase
+        .rpc('check_and_save_spark', params);
+
+      console.log('RPC Response:', { data, error });
+
+      if (error) {
+        // Check if this was a similarity error
+        if (error.message.includes('Similar spark found')) {
+          const similarityScore = parseFloat(error.message.split(' ').pop() || '0');
+          console.log('Found similar spark with score:', `${(similarityScore * 100).toFixed(2)}%`);
+          throw new Error(`Spark too similar to existing spark (similarity: ${(similarityScore * 100).toFixed(2)}%)`);
+        }
+        throw error;
+      }
+
+      if (!data) {
+        console.error('No data returned from check_and_save_spark RPC call');
+        throw new Error('No data returned from check_and_save_spark');
+      }
+
+      // Log the raw data to understand its structure
+      console.log('Raw RPC response data:', JSON.stringify(data, null, 2));
+
+      // Handle both possible response formats
+      const sparkId = typeof data === 'string' ? data : data.id;
+      
+      if (!sparkId) {
+        console.error('No spark ID found in response data:', data);
+        throw new Error('No ID returned from check_and_save_spark');
+      }
+
+      // Log similarity scores if any were returned
+      if (data.similarity_scores && data.similarity_scores.length > 0) {
+        console.log('=== Similarity Scores ===');
+        data.similarity_scores.forEach((score: SimilarityScore) => {
+          console.log(`Score: ${(score.similarity_score * 100).toFixed(2)}% for: "${score.content.substring(0, 100)}..."`);
+        });
+      } else {
+        console.log('No similar sparks found');
+      }
+
+      console.log('Spark and embedding saved successfully with ID:', sparkId);
+      return { id: sparkId, ...spark, user_id: userId };
+    } catch (error) {
+      console.error('Error in saveSparkWithEmbedding:', error);
+      if (error instanceof Error) {
+        const pgError = error as unknown as PostgrestError;
+        console.error('Error details:', {
+          name: pgError.name || error.name,
+          message: pgError.message || error.message,
+          code: pgError.code,
+          details: pgError.details,
+          hint: pgError.hint
+        });
+      }
+      throw error;
+    }
   }
 };

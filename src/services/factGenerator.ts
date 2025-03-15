@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { generateSpark } from '../api/openai';
+import { generateSpark, generateEmbedding } from '../api/openai';
 import { supabaseApi } from '../api/supabase';
 import { notificationService } from './notificationService';
 import { AVAILABLE_TOPICS } from '../constants/topics';
@@ -41,38 +41,140 @@ function getUTCStartEndOfDay(localDate: string): { start: Date, end: Date } {
   return { start: startUTC, end: endUTC };
 }
 
+// Helper function to check if a lock is stale
+function isLockStale(lockTimestamp: string): boolean {
+  try {
+    const lockTime = new Date(lockTimestamp);
+    const now = new Date();
+    
+    // If the timestamp is in the future, the lock is invalid
+    if (lockTime > now) {
+      console.log('Lock timestamp is in the future, considering stale:', lockTimestamp);
+      return true;
+    }
+
+    // If the timestamp is from a different day, the lock is stale
+    if (getLocalDateString(lockTime) !== getLocalDateString(now)) {
+      console.log('Lock is from a different day, considering stale');
+      return true;
+    }
+
+    // If the lock is older than 5 minutes, it's stale
+    const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
+    const isStale = lockTime < fiveMinutesAgo;
+    if (isStale) {
+      console.log('Lock is older than 5 minutes, considering stale');
+    }
+    return isStale;
+  } catch (error) {
+    console.error('Error parsing lock timestamp, considering stale:', error);
+    return true;
+  }
+}
+
+async function cleanupStaleLocks(userId: string): Promise<void> {
+  try {
+    const lockKey = `${SPARK_GENERATION_LOCK_KEY}_${userId}`;
+    console.log('Checking for stale locks...');
+    
+    const existingLock = await AsyncStorage.getItem(lockKey);
+    if (existingLock) {
+      try {
+        const lockData = JSON.parse(existingLock);
+        if (isLockStale(lockData.timestamp)) {
+          console.log('Found stale lock, removing');
+          await AsyncStorage.removeItem(lockKey);
+        }
+      } catch (error) {
+        console.warn('Error checking stale lock, removing:', error);
+        await AsyncStorage.removeItem(lockKey);
+      }
+    }
+  } catch (error) {
+    console.error('Error in cleanupStaleLocks:', error);
+  }
+}
+
 async function acquireLock(userId: string): Promise<boolean> {
   try {
     const lockKey = `${SPARK_GENERATION_LOCK_KEY}_${userId}`;
-    const existingLock = await AsyncStorage.getItem(lockKey);
+    console.log('Attempting to acquire lock:', lockKey);
     
-    if (existingLock) {
-      const lockData = JSON.parse(existingLock);
-      const lockTime = new Date(lockData.timestamp);
-      const now = new Date();
-      
-      // If lock is older than 5 minutes, consider it stale
-      if (now.getTime() - lockTime.getTime() > 5 * 60 * 1000) {
-        await AsyncStorage.setItem(lockKey, JSON.stringify({ timestamp: now.toISOString() }));
-        return true;
-      }
-      return false;
+    // First try to get the existing lock
+    let existingLock: string | null = null;
+    try {
+      existingLock = await AsyncStorage.getItem(lockKey);
+      console.log('Existing lock:', existingLock);
+    } catch (error) {
+      console.warn('Error reading lock, assuming no lock exists:', error);
     }
     
-    await AsyncStorage.setItem(lockKey, JSON.stringify({ timestamp: new Date().toISOString() }));
-    return true;
+    if (existingLock) {
+      try {
+        const lockData = JSON.parse(existingLock);
+        
+        // Check if the lock is stale
+        if (isLockStale(lockData.timestamp)) {
+          console.log('Found stale lock, overwriting');
+          await AsyncStorage.setItem(lockKey, JSON.stringify({ timestamp: new Date().toISOString() }));
+          return true;
+        }
+        console.log('Found valid lock, cannot acquire');
+        return false;
+      } catch (error) {
+        console.warn('Error parsing lock data, treating as invalid:', error);
+        // If we can't parse the lock data, consider it invalid
+        await AsyncStorage.setItem(lockKey, JSON.stringify({ timestamp: new Date().toISOString() }));
+        return true;
+      }
+    }
+    
+    // No existing lock, try to acquire
+    try {
+      console.log('No existing lock, attempting to acquire');
+      const now = new Date();
+      await AsyncStorage.setItem(lockKey, JSON.stringify({ timestamp: now.toISOString() }));
+      
+      // Verify the lock was actually set
+      const verifyLock = await AsyncStorage.getItem(lockKey);
+      if (!verifyLock) {
+        console.error('Lock verification failed - lock was not set');
+        return false;
+      }
+      
+      console.log('Successfully acquired and verified lock');
+      return true;
+    } catch (error) {
+      console.error('Error setting lock:', error);
+      return false;
+    }
   } catch (error) {
-    console.error('Error acquiring lock:', error);
-    return false;
+    console.error('Error in acquireLock:', error);
+    // If we hit an unexpected error, assume no lock for safety
+    return true;
   }
 }
 
 async function releaseLock(userId: string): Promise<void> {
   try {
     const lockKey = `${SPARK_GENERATION_LOCK_KEY}_${userId}`;
-    await AsyncStorage.removeItem(lockKey);
+    console.log('Attempting to release lock:', lockKey);
+    
+    try {
+      await AsyncStorage.removeItem(lockKey);
+      
+      // Verify the lock was actually removed
+      const verifyRemoved = await AsyncStorage.getItem(lockKey);
+      if (verifyRemoved) {
+        console.warn('Lock removal verification failed - lock still exists');
+      } else {
+        console.log('Successfully released and verified lock removal');
+      }
+    } catch (error) {
+      console.error('Error removing lock:', error);
+    }
   } catch (error) {
-    console.error('Error releasing lock:', error);
+    console.error('Error in releaseLock:', error);
   }
 }
 
@@ -110,35 +212,61 @@ export const sparkGeneratorService = {
 
     // Generate sparks
     for (let i = 0; i < TOTAL_DAILY_SPARKS; i++) {
-      const topicsForGeneration = this.selectTopicsWithBandit(selectedTopics);
+      let attempts = 0;
+      const MAX_ATTEMPTS = 3;
+      let savedSpark = null;
 
-      console.log(`Generating spark ${i + 1} of ${TOTAL_DAILY_SPARKS} for topics:`, topicsForGeneration);
-      const generatedSpark = await generateSpark(topicsForGeneration, userPreferences);
+      while (attempts < MAX_ATTEMPTS && !savedSpark) {
+        try {
+          attempts++;
+          const topicsForGeneration = this.selectTopicsWithBandit(selectedTopics);
+          console.log(`Generating spark ${i + 1} of ${TOTAL_DAILY_SPARKS} (Attempt ${attempts}/${MAX_ATTEMPTS})`);
+          console.log('Selected topics:', topicsForGeneration);
 
-      // Save to Supabase
-      const { data: savedSpark, error } = await supabaseApi.saveSpark({
-        content: generatedSpark.content,
-        topic: generatedSpark.topic,
-        details: generatedSpark.details
-      }, userId);
+          const generatedSpark = await generateSpark(topicsForGeneration, userPreferences, userId);
+          console.log(`Generated spark ${i + 1}: Content length: ${generatedSpark.content.length}, Details length: ${generatedSpark.details.length}`);
 
-      if (error || !savedSpark || savedSpark.length === 0) {
-        console.error('Error saving spark to Supabase:', error);
-        throw new Error('Failed to save spark');
+          // Generate embedding for similarity check
+          const embedding = await generateEmbedding(generatedSpark.content, generatedSpark.details);
+
+          // Try to save with embedding and similarity check
+          savedSpark = await supabaseApi.saveSparkWithEmbedding({
+            content: generatedSpark.content,
+            topic: generatedSpark.topic,
+            details: generatedSpark.details
+          }, embedding, userId);
+
+          console.log(`Successfully saved spark ${i + 1} with topic: ${generatedSpark.topic}`);
+
+          const spark: DailySpark = {
+            id: savedSpark.id,
+            content: generatedSpark.content,
+            topic: generatedSpark.topic,
+            details: generatedSpark.details,
+            date: today,
+            userId: userId,
+            generatedAt: new Date().toISOString(),
+            sparkIndex: i + 1
+          };
+
+          sparks.push(spark);
+        } catch (error) {
+          if (error instanceof Error && error.message.includes('too similar')) {
+            console.log(`Attempt ${attempts}: Generated spark was too similar, retrying...`);
+            if (attempts >= MAX_ATTEMPTS) {
+              throw new Error(`Failed to generate a unique spark after ${MAX_ATTEMPTS} attempts`);
+            }
+            // Continue to next attempt
+            continue;
+          }
+          // For other errors, throw immediately
+          throw error;
+        }
       }
 
-      const spark: DailySpark = {
-        id: savedSpark[0].id,
-        content: generatedSpark.content,
-        topic: generatedSpark.topic,
-        details: generatedSpark.details,
-        date: today,
-        userId: userId,
-        generatedAt: savedSpark[0].created_at,
-        sparkIndex: i + 1
-      };
-
-      sparks.push(spark);
+      if (!savedSpark) {
+        throw new Error(`Failed to generate and save spark ${i + 1} after ${MAX_ATTEMPTS} attempts`);
+      }
     }
 
     // Save to local storage
@@ -160,8 +288,13 @@ export const sparkGeneratorService = {
       console.log('Current time:', now.toLocaleString());
       console.log('Local date:', today);
 
+      // Clean up any stale locks before starting
+      await cleanupStaleLocks(userId);
+
       let retryCount = 0;
       const MAX_RETRIES = 3;
+      const LOCK_RETRY_DELAY = 2000; // 2 seconds
+      const MAX_LOCK_ATTEMPTS = 3;
 
       while (retryCount < MAX_RETRIES) {
         // Check Supabase for today's sparks using date range
@@ -179,79 +312,61 @@ export const sparkGeneratorService = {
           return await this._findFirstUninteractedSpark(existingSparks, userId, today);
         }
 
-        // If we have an incomplete set, generate all remaining sparks
-        if (incomplete) {
-          console.log(`Attempt ${retryCount + 1}/${MAX_RETRIES}: Generating remaining sparks (${existingSparks?.length || 0}/${TOTAL_DAILY_SPARKS})`);
+        // If we have an incomplete set or no sparks at all, try to acquire lock
+        let lockAttempts = 0;
+        let lockAcquired = false;
+
+        while (lockAttempts < MAX_LOCK_ATTEMPTS && !lockAcquired) {
+          console.log(`Lock attempt ${lockAttempts + 1}/${MAX_LOCK_ATTEMPTS}`);
+          lockAcquired = await acquireLock(userId);
           
-          const remainingCount = TOTAL_DAILY_SPARKS - (existingSparks?.length || 0);
-          const newSparks: DailySpark[] = [];
-          const startIndex = existingSparks?.length || 0;
-          
-          // Generate all remaining sparks
-          for (let i = 0; i < remainingCount; i++) {
-            const currentSparkNumber = startIndex + i + 1;
-            console.log(`=== Generating Spark ${currentSparkNumber}/${TOTAL_DAILY_SPARKS} ===`);
-            
-            const topicsForGeneration = this.selectTopicsWithBandit(selectedTopics);
-            console.log('Selected topics:', topicsForGeneration);
-            const generatedSpark = await generateSpark(topicsForGeneration, userPreferences);
-
-            console.log(`Spark ${currentSparkNumber}: Content length: ${generatedSpark.content.length}, Details length: ${generatedSpark.details.length}`);
-
-            // Save to Supabase
-            const { data: savedSpark, error } = await supabaseApi.saveSpark({
-              content: generatedSpark.content,
-              topic: generatedSpark.topic,
-              details: generatedSpark.details
-            }, userId);
-
-            if (error || !savedSpark || savedSpark.length === 0) {
-              console.error(`Failed to save spark ${currentSparkNumber}, retrying...`);
-              retryCount++;
-              await new Promise(resolve => setTimeout(resolve, 2000));
-              continue;
-            }
-
-            console.log(`Successfully saved spark ${currentSparkNumber} with topic: ${generatedSpark.topic}`);
-
-            const spark: DailySpark = {
-              id: savedSpark[0].id,
-              content: generatedSpark.content,
-              topic: generatedSpark.topic,
-              details: generatedSpark.details,
-              date: today,
-              userId: userId,
-              generatedAt: savedSpark[0].created_at,
-              sparkIndex: currentSparkNumber
-            };
-
-            newSparks.push(spark);
-          }
-
-          // If we successfully generated all remaining sparks
-          if (newSparks.length === remainingCount) {
-            // Save to local storage for faster access
-            const userSparkKey = `${DAILY_SPARK_KEY}_${userId}`;
-            const existingStoredSparks = await AsyncStorage.getItem(userSparkKey);
-            const storedSparks: DailySpark[] = existingStoredSparks ? JSON.parse(existingStoredSparks) : [];
-            storedSparks.push(...newSparks);
-            await AsyncStorage.setItem(userSparkKey, JSON.stringify(storedSparks));
-
-            // Return the first uninteracted spark from the complete set
-            const { data: completeSparks } = await supabaseApi.getSparksForDateRange(
-              userId,
-              start.toISOString(),
-              end.toISOString()
-            );
-            
-            if (completeSparks && completeSparks.length > 0) {
-              return await this._findFirstUninteractedSpark(completeSparks, userId, today);
+          if (!lockAcquired) {
+            lockAttempts++;
+            if (lockAttempts < MAX_LOCK_ATTEMPTS) {
+              console.log(`Lock not acquired, waiting ${LOCK_RETRY_DELAY}ms before retry...`);
+              await new Promise(resolve => setTimeout(resolve, LOCK_RETRY_DELAY));
             }
           }
         }
 
-        // If no sparks exist at all, generate the full set
-        return await this._generateFullDailySparkSet(userId, selectedTopics, userPreferences);
+        if (!lockAcquired) {
+          console.log('Failed to acquire lock after maximum attempts');
+          retryCount++;
+          if (retryCount < MAX_RETRIES) {
+            console.log(`Retrying entire spark generation process (${retryCount + 1}/${MAX_RETRIES})`);
+            continue;
+          }
+          throw new Error('Failed to acquire lock for spark generation');
+        }
+
+        try {
+          // Double-check if sparks were generated while we were acquiring the lock
+          const { data: recentSparks, incomplete: stillIncomplete } = await supabaseApi.getSparksForDateRange(
+            userId,
+            start.toISOString(),
+            end.toISOString()
+          );
+
+          if (!stillIncomplete && recentSparks && recentSparks.length > 0) {
+            console.log('Sparks were generated while acquiring lock');
+            return await this._findFirstUninteractedSpark(recentSparks, userId, today);
+          }
+
+          // Generate the full set of sparks
+          console.log('Generating full set of sparks');
+          const result = await this.generateDailySpark(userId, selectedTopics, userPreferences);
+          console.log('Successfully generated full set of sparks');
+          return result;
+        } catch (error) {
+          console.error('Error while generating sparks:', error);
+          retryCount++;
+          if (retryCount < MAX_RETRIES) {
+            console.log(`Will retry spark generation (${retryCount + 1}/${MAX_RETRIES})`);
+          }
+          throw error;
+        } finally {
+          await releaseLock(userId);
+        }
       }
 
       throw new Error('Failed to generate sparks after maximum retries');
@@ -278,21 +393,6 @@ export const sparkGeneratorService = {
       }
     }
     return null;
-  },
-
-  // Helper method to generate full set of sparks
-  async _generateFullDailySparkSet(userId: string, selectedTopics: string[], userPreferences: string): Promise<DailySpark | null> {
-    const lockAcquired = await acquireLock(userId);
-    if (!lockAcquired) {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      return await this.getTodaysSpark(userId, selectedTopics, userPreferences);
-    }
-
-    try {
-      return await this.generateDailySpark(userId, selectedTopics, userPreferences);
-    } finally {
-      await releaseLock(userId);
-    }
   },
 
   async checkIfSparkAvailableToday(userId: string): Promise<boolean> {
