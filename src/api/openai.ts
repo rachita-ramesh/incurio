@@ -58,7 +58,7 @@ export const generateSpark = async (
               + "3. Surprising insight \n"
               + "Response format:\n"
               + "{\n"
-              + '  "content": "ONE spark using exactly ONE of the above formats (100-200 chars). NO calls to action. MUST BE UNIQUE AND DIFFERENT FROM PREVIOUS SPARKS.",\n'
+              + '  "content": "ONE spark using exactly ONE of the above formats (100-200 chars). NO calls to action. MUST BE UNIQUE AND DIFFERENT FROM PREVIOUS SPARKS. Use plain text for mathematical symbols (e.g. pi instead of π or \\pi).",\n'
               + '  "details": "A captivating exploration without markdown headers (maximum 200 words). It should be consumable. Write in a flowing, narrative style with section breaks.",\n'
               + '  "topic": "MUST be one of the provided topics"\n'
               + "}\n\n"
@@ -67,6 +67,8 @@ export const generateSpark = async (
               + "- Avoid repetitive themes or similar concepts\n"
               + "- Focus on fascinating, lesser-known facts and perspectives\n"
               + "- Make it engaging and scientifically accurate\n"
+              + "- Use plain text for mathematical symbols and formulas\n"
+              + "- Do NOT use LaTeX notation or special characters\n"
               + "- Do NOT use markdown headers (###) in the response\n"
               + "- Do not mention the format name meaning don't say 'Surprising Insight' or 'Thought-provoking question' or anything like that"
           },
