@@ -288,88 +288,23 @@ export const sparkGeneratorService = {
       console.log('Current time:', now.toLocaleString());
       console.log('Local date:', today);
 
-      // Clean up any stale locks before starting
-      await cleanupStaleLocks(userId);
+      // Get UTC start and end times for the local date
+      const { start, end } = getUTCStartEndOfDay(today);
+      console.log('Checking Supabase for sparks between:', start.toISOString(), 'and', end.toISOString());
+      
+      const { data: existingSparks } = await supabaseApi.getSparksForDateRange(
+        userId,
+        start.toISOString(),
+        end.toISOString()
+      );
 
-      let retryCount = 0;
-      const MAX_RETRIES = 3;
-      const LOCK_RETRY_DELAY = 2000; // 2 seconds
-      const MAX_LOCK_ATTEMPTS = 3;
-
-      while (retryCount < MAX_RETRIES) {
-        // Check Supabase for today's sparks using date range
-        const { start, end } = getUTCStartEndOfDay(today);
-        console.log('Checking Supabase for sparks between:', start.toISOString(), 'and', end.toISOString());
-        
-        const { data: existingSparks, incomplete } = await supabaseApi.getSparksForDateRange(
-          userId,
-          start.toISOString(),
-          end.toISOString()
-        );
-
-        // If we have a complete set, find first uninteracted spark
-        if (!incomplete && existingSparks && existingSparks.length > 0) {
-          return await this._findFirstUninteractedSpark(existingSparks, userId, today);
-        }
-
-        // If we have an incomplete set or no sparks at all, try to acquire lock
-        let lockAttempts = 0;
-        let lockAcquired = false;
-
-        while (lockAttempts < MAX_LOCK_ATTEMPTS && !lockAcquired) {
-          console.log(`Lock attempt ${lockAttempts + 1}/${MAX_LOCK_ATTEMPTS}`);
-          lockAcquired = await acquireLock(userId);
-          
-          if (!lockAcquired) {
-            lockAttempts++;
-            if (lockAttempts < MAX_LOCK_ATTEMPTS) {
-              console.log(`Lock not acquired, waiting ${LOCK_RETRY_DELAY}ms before retry...`);
-              await new Promise(resolve => setTimeout(resolve, LOCK_RETRY_DELAY));
-            }
-          }
-        }
-
-        if (!lockAcquired) {
-          console.log('Failed to acquire lock after maximum attempts');
-          retryCount++;
-          if (retryCount < MAX_RETRIES) {
-            console.log(`Retrying entire spark generation process (${retryCount + 1}/${MAX_RETRIES})`);
-            continue;
-          }
-          throw new Error('Failed to acquire lock for spark generation');
-        }
-
-        try {
-          // Double-check if sparks were generated while we were acquiring the lock
-          const { data: recentSparks, incomplete: stillIncomplete } = await supabaseApi.getSparksForDateRange(
-            userId,
-            start.toISOString(),
-            end.toISOString()
-          );
-
-          if (!stillIncomplete && recentSparks && recentSparks.length > 0) {
-            console.log('Sparks were generated while acquiring lock');
-            return await this._findFirstUninteractedSpark(recentSparks, userId, today);
-          }
-
-          // Generate the full set of sparks
-          console.log('Generating full set of sparks');
-          const result = await this.generateDailySpark(userId, selectedTopics, userPreferences);
-          console.log('Successfully generated full set of sparks');
-          return result;
-        } catch (error) {
-          console.error('Error while generating sparks:', error);
-          retryCount++;
-          if (retryCount < MAX_RETRIES) {
-            console.log(`Will retry spark generation (${retryCount + 1}/${MAX_RETRIES})`);
-          }
-          throw error;
-        } finally {
-          await releaseLock(userId);
-        }
+      if (!existingSparks || existingSparks.length === 0) {
+        console.log('No sparks found for today');
+        return null;
       }
 
-      throw new Error('Failed to generate sparks after maximum retries');
+      // Find first uninteracted spark
+      return await this._findFirstUninteractedSpark(existingSparks, userId, today);
     } catch (error) {
       console.error('Error in getTodaysSpark:', error);
       throw error;
