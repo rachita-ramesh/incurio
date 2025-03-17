@@ -106,10 +106,9 @@ function AppContent(): React.JSX.Element {
               .from('users')
               .insert([{
                 id: initialSession.user.id,
-                email: initialSession.user.email,
                 preferences: [],
                 created_at: new Date().toISOString(),
-                last_login: new Date().toISOString()
+                updated_at: new Date().toISOString()
               }]);
             setInitialRoute('Topic');
           } else {
@@ -146,10 +145,9 @@ function AppContent(): React.JSX.Element {
                 .from('users')
                 .insert([{
                   id: newSession.user.id,
-                  email: newSession.user.email,
                   preferences: [],
                   created_at: new Date().toISOString(),
-                  last_login: new Date().toISOString()
+                  updated_at: new Date().toISOString()
                 }]);
               setInitialRoute('Topic');
             } else {

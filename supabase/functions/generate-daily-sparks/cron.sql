@@ -6,8 +6,8 @@ select
     $$
     select
       net.http_post(
-        url:='https://' || (select net.http_get('https://supabase.com/api/projects/' || current_setting('app.settings.project_id'))::json->>'ref') || '.functions.supabase.co/generate-daily-sparks',
-        headers:='{"Authorization": "Bearer ' || current_setting('app.settings.service_role_key') || '"}'::jsonb
+        url:='https://' || (select net.http_get('https://supabase.com/api/projects/' || current_setting('app.settings.project_id')).url) || '.functions.supabase.co/generate-daily-sparks',
+        headers:='{"Authorization": "Bearer ' || current_setting('app.settings.service_role_key') || '"}')::jsonb
       ) as request_id;
     $$
   ); 

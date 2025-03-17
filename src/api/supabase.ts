@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@env';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { GeneratedRecommendation } from './openai';
-import { TOTAL_DAILY_SPARKS } from '../services/factGenerator';
+import { TOTAL_DAILY_SPARKS } from '../services/sparkGenerator';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
@@ -15,9 +15,9 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 
 export interface User {
   id: string;
-  email: string;
   preferences: string[];
   created_at: string;
+  updated_at: string;
 }
 
 export interface Spark {

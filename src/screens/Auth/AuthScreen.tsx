@@ -166,10 +166,9 @@ export const AuthScreen: React.FC<Props> = ({ navigation }) => {
             .insert([
               {
                 id: user.id,
-                email: user.email,
                 preferences: [],
                 created_at: new Date().toISOString(),
-                last_login: new Date().toISOString()
+                updated_at: new Date().toISOString()
               }
             ]);
 
@@ -186,7 +185,7 @@ export const AuthScreen: React.FC<Props> = ({ navigation }) => {
           // Update last login
           await supabase
             .from('users')
-            .update({ last_login: new Date().toISOString() })
+            .update({ updated_at: new Date().toISOString() })
             .eq('id', user.id);
 
           if (existingProfile.preferences?.length > 0) {

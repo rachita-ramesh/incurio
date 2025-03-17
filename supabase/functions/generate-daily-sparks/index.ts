@@ -29,7 +29,7 @@ interface GeneratedContent {
 }
 
 interface User {
-  id: string;
+  user_id: string;
   preferences: string[];
 }
 
@@ -212,7 +212,8 @@ async function generateSparksForUser(userId: string, preferences: string[]) {
           p_details: generatedSpark.details,
           p_user_id: userId,
           p_embedding: embedding,
-          p_similarity_threshold: 0.85
+          p_similarity_threshold: 0.85,
+          p_is_curiosity_trail: false
         });
 
         if (error) {
@@ -237,9 +238,45 @@ async function generateSparksForUser(userId: string, preferences: string[]) {
 
 serve(async (req: Request) => {
   try {
+    // Check if we have required environment variables
+    const requiredEnvVars = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'OPENAI_API_KEY'];
+    for (const envVar of requiredEnvVars) {
+      if (!Deno.env.get(envVar)) {
+        throw new Error(`Missing required environment variable: ${envVar}`);
+      }
+    }
+
+    // Add logging to help debug
+    console.log("Starting generate-daily-sparks function...");
+    console.log(`OPENAI_API_KEY exists: ${!!Deno.env.get('OPENAI_API_KEY')}`);
+    console.log(`SUPABASE_URL exists: ${!!Deno.env.get('SUPABASE_URL')}`);
+    console.log(`SUPABASE_SERVICE_ROLE_KEY exists: ${!!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`);
+
+    // Test OpenAI connection
+    console.log("Testing OpenAI connection...");
+    try {
+      const models = await openai.models.list();
+      console.log(`OpenAI models available: ${models.data.length}`);
+    } catch (error) {
+      console.error("OpenAI connection error:", error);
+      throw new Error("OpenAI connection failed");
+    }
+
+    // Test database connection
+    console.log("Testing Supabase database connection...");
+    try {
+      // Use a simple select query that just checks if the table exists
+      const { data, error } = await supabaseAdmin.from('user_preferences').select('user_id').limit(1);
+      if (error) throw error;
+      console.log(`Database connected successfully. Found user_preferences table.`);
+    } catch (error) {
+      console.error("Database connection error:", error);
+      throw new Error("Database error: Unable to connect to user_preferences table");
+    }
+
     const { data: users, error: userError } = await supabaseAdmin
-      .from('users')
-      .select('id, preferences');
+      .from('user_preferences')
+      .select('user_id, preferences');
 
     if (userError) throw userError;
 
@@ -252,7 +289,8 @@ serve(async (req: Request) => {
       console.log(`Processing batch ${i / BATCH_SIZE + 1}, users ${i + 1}-${Math.min(i + BATCH_SIZE, users.length)}`);
       
       const batchResults = await Promise.allSettled(
-        batch.map((user: User) => generateSparksForUser(user.id, user.preferences))
+        batch.map((user: { user_id: string, preferences: string[] }) => 
+          generateSparksForUser(user.user_id, user.preferences))
       );
       
       results.push(...batchResults);
@@ -272,16 +310,33 @@ serve(async (req: Request) => {
         results: {
           total: users.length,
           succeeded,
-          failed
+          failed,
+          timestamp: new Date().toISOString()
         }
       }),
       { headers: { 'Content-Type': 'application/json' } }
     );
   } catch (error: unknown) {
     console.error('Error in generate-daily-sparks:', error);
+    
+    // Provide more detailed error information
+    const errorMessage = error instanceof Error 
+      ? {
+          message: error.message,
+          name: error.name,
+          stack: Deno.env.get('ENVIRONMENT') === 'development' ? error.stack : undefined
+        }
+      : 'Unknown error';
+
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+      JSON.stringify({ 
+        error: errorMessage,
+        timestamp: new Date().toISOString()
+      }),
+      { 
+        status: 500, 
+        headers: { 'Content-Type': 'application/json' } 
+      }
     );
   }
 });

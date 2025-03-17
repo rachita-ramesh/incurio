@@ -1,1 +1,0 @@
-alter table users enable row level security; create policy "Users can insert their own profile" on users for insert with check (auth.uid()::uuid = id); create policy "Users can view their own profile" on users for select using (auth.uid()::uuid = id); create policy "Users can update their own profile" on users for update using (auth.uid()::uuid = id);

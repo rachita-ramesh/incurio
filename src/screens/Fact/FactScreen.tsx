@@ -1,27 +1,31 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ActivityIndicator,
   TouchableOpacity,
-  SafeAreaView,
+  Animated,
+  Image,
   Alert,
+  RefreshControl,
   AppState,
+  Platform,
   AppStateStatus,
 } from 'react-native';
-import { sparkGeneratorService, DAILY_SPARK_KEY } from '../../services/factGenerator';
-import { supabase } from '../../api/supabase';
-import { supabaseApi } from '../../api/supabase';
+import { sparkGeneratorService, DAILY_SPARK_KEY } from '../../services/sparkGenerator';
+import { supabase, supabaseApi } from '../../api/supabase';
 import { generateRecommendation, type GeneratedRecommendation } from '../../api/openai';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { SwipeableSpark } from '../../components/SwipeableFact';
-import { SparkConsumedScreen } from '../../components/SparkConsumedScreen';
+import { ScrollView } from 'react-native-gesture-handler';
+import { RotateNoteIcon } from '../../components/common/RotateNoteIcon';
+import { colors } from '../../theme/colors';
 import { notificationService } from '../../services/notificationService';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useTheme } from '../../theme/ThemeContext';
 import { useUser } from '../../contexts/UserContext';
 import { RecommendationModal } from '../../components/RecommendationModal';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useTheme } from '../../theme/ThemeContext';
 
 type RootStackParamList = {
   Auth: undefined;

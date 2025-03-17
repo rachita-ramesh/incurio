@@ -1,5 +1,5 @@
 import BackgroundFetch from 'react-native-background-fetch';
-import { sparkGeneratorService } from './factGenerator';
+import { sparkGeneratorService } from './sparkGenerator';
 import { supabase } from '../api/supabase';
 import { notificationService } from './notificationService';
 
