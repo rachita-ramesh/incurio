@@ -3,6 +3,7 @@ import { generateSpark, generateEmbedding } from '../api/openai';
 import { supabaseApi } from '../api/supabase';
 import { notificationService } from './notificationService';
 import { AVAILABLE_TOPICS } from '../constants/topics';
+import { supabase } from '../api/supabase';
 
 export const DAILY_SPARK_KEY = 'daily_spark';
 export const SPARK_INTERACTION_KEY = 'spark_interaction';
@@ -313,21 +314,44 @@ export const sparkGeneratorService = {
 
   // Helper method to find first uninteracted spark
   async _findFirstUninteractedSpark(sparks: any[], userId: string, today: string): Promise<DailySpark | null> {
-    for (let i = 0; i < sparks.length; i++) {
-      const spark = sparks[i];
-      const interactionKey = `${SPARK_INTERACTION_KEY}_${userId}_${today}_${i + 1}`;
-      const hasInteraction = await AsyncStorage.getItem(interactionKey);
+    try {
+      // Get all interactions for this user directly from the database
+      const { data: interactions, error } = await supabase
+        .from('user_interactions')
+        .select('spark_id')
+        .eq('user_id', userId);
       
-      if (!hasInteraction) {
-        return {
-          ...spark,
-          sparkIndex: i + 1,
-          date: today,
-          userId: userId
-        };
+      if (error) {
+        console.error('Error fetching interactions:', error);
+        throw error;
       }
+      
+      // Create a set of interacted spark IDs for quick lookup
+      const interactedIds = new Set(interactions?.map(i => i.spark_id) || []);
+      console.log(`User has interacted with ${interactedIds.size} sparks in total`);
+      
+      // Find first uninteracted spark
+      for (let i = 0; i < sparks.length; i++) {
+        const spark = sparks[i];
+        
+        // Check if this spark has been interacted with
+        if (!interactedIds.has(spark.id)) {
+          console.log(`Found uninteracted spark: ${spark.id}`);
+          return {
+            ...spark,
+            sparkIndex: i + 1,
+            date: today,
+            userId: userId
+          };
+        }
+      }
+      
+      console.log('All sparks have been interacted with');
+      return null;
+    } catch (error) {
+      console.error('Error in _findFirstUninteractedSpark:', error);
+      return null;
     }
-    return null;
   },
 
   async checkIfSparkAvailableToday(userId: string): Promise<boolean> {

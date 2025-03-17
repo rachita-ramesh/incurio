@@ -20,13 +20,12 @@ import { generateRecommendation, type GeneratedRecommendation } from '../../api/
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { SwipeableSpark } from '../../components/SwipeableFact';
 import { ScrollView } from 'react-native-gesture-handler';
-import { RotateNoteIcon } from '../../components/common/RotateNoteIcon';
-import { colors } from '../../theme/colors';
 import { notificationService } from '../../services/notificationService';
 import { useUser } from '../../contexts/UserContext';
 import { RecommendationModal } from '../../components/RecommendationModal';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../theme/ThemeContext';
+import { SparkConsumedScreen } from '../../components/SparkConsumedScreen';
 
 type RootStackParamList = {
   Auth: undefined;
@@ -86,6 +85,7 @@ const getUninteractedSparksCount = async (userId: string): Promise<number> => {
       .from('sparks')
       .select('id')
       .eq('user_id', userId)
+      .eq('is_curiosity_trail', false)
       .gte('created_at', startOfDay.toISOString())
       .lt('created_at', endOfDay.toISOString());
 
@@ -233,6 +233,7 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
           .from('sparks')
           .select('id, content, topic, details, created_at')
           .eq('user_id', user.id)
+          .eq('is_curiosity_trail', false)
           .gte('created_at', startOfDay.toISOString())
           .lt('created_at', endOfDay.toISOString());
 
@@ -377,6 +378,7 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
           .from('sparks')
           .select('id, content, topic, details, created_at')
           .eq('user_id', user.id)
+          .eq('is_curiosity_trail', false)
           .gte('created_at', startOfDay.toISOString())
           .lt('created_at', endOfDay.toISOString());
 
@@ -627,6 +629,7 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
           .from('sparks')
           .select('id, content, topic, details, created_at')
           .eq('user_id', user.id)
+          .eq('is_curiosity_trail', false)
           .gte('created_at', startOfDay.toISOString())
           .lt('created_at', endOfDay.toISOString());
 
@@ -724,15 +727,6 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
             <Text style={styles.retryButtonText}>Try Again</Text>
           </TouchableOpacity>
         </View>
-      ) : sparkConsumed ? (
-        <View style={styles.consumedContainer}>
-          <Text style={[styles.consumedText, { color: theme.text.primary }]}>
-            You've seen all your sparks for today!
-          </Text>
-          <TouchableOpacity style={styles.refreshButton} onPress={handleRefresh}>
-            <Text style={styles.refreshButtonText}>Check Again</Text>
-          </TouchableOpacity>
-        </View>
       ) : (
         <>
           {checkSparkAvailability() && spark && (
@@ -802,7 +796,7 @@ const styles = StyleSheet.create({
   curiosityHubButtonText: {
     fontSize: 24,
   },
-    buttonContainer: {
+  buttonContainer: {
     alignItems: 'center',
     marginTop: 16,
   },
@@ -810,11 +804,18 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
   },
   consumedText: {
-    fontSize: 16,
+    fontSize: 18,
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: 8,
+    fontFamily: 'AvenirNext-Medium',
+  },
+  consumedSubText: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 24,
     fontFamily: 'AvenirNext-Regular',
   },
   refreshButton: {
