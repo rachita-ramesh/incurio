@@ -152,47 +152,40 @@ export const AuthScreen: React.FC<Props> = ({ navigation }) => {
       }
 
       if (user) {
-        // Check if user profile exists
-        const { data: existingProfile, error: checkError } = await supabase
-          .from('users')
+        // Check if user exists in our database
+        const { data: userData, error: userError } = await supabase
+          .from('user_preferences')
           .select('preferences')
-          .eq('id', user.id)
+          .eq('user_id', user.id)
           .single();
 
-        if (!existingProfile) {
-          console.log('Creating new user profile...');
-          const { error: profileError } = await supabase
-            .from('users')
-            .insert([
-              {
-                id: user.id,
-                preferences: [],
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-              }
-            ]);
+        if (userError && userError.code !== 'PGRST116') { // PGRST116 is "no rows found" error
+          throw userError;
+        }
 
-          if (profileError) {
-            console.error('Error creating user profile:', profileError);
-          } else {
-            // Schedule notifications for new users
-            await notificationService.requestPermissions();
-            notificationService.scheduleDailyNotification();
-          }
-          navigation.replace('Topic');
+        // If user doesn't exist in our database, create a record
+        if (!userData) {
+          const { error: insertError } = await supabase
+            .from('user_preferences')
+            .insert([{
+              id: user.id,
+              preferences: [],
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            }]);
+
+          if (insertError) throw insertError;
+        }
+
+        // Schedule notifications for new users
+        await notificationService.requestPermissions();
+        notificationService.scheduleDailyNotification();
+        
+        // Navigate based on preferences: Topic screen for new users, Fact screen for existing users
+        if (userData && userData.preferences && userData.preferences.length > 0) {
+          navigation.replace('Fact', { selectedTopics: userData.preferences });
         } else {
-          console.log('User profile exists with preferences:', existingProfile.preferences);
-          // Update last login
-          await supabase
-            .from('users')
-            .update({ updated_at: new Date().toISOString() })
-            .eq('id', user.id);
-
-          if (existingProfile.preferences?.length > 0) {
-            navigation.replace('Fact', { selectedTopics: existingProfile.preferences });
-          } else {
-            navigation.replace('Topic');
-          }
+          navigation.replace('Topic');
         }
       }
 

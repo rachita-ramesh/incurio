@@ -34,9 +34,9 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (authUser) {
         // Get user preferences from database
         const { data, error: dbError } = await supabase
-          .from('users')
+          .from('user_preferences')
           .select('*')
-          .eq('id', authUser.id)
+          .eq('user_id', authUser.id)
           .single();
         
         if (dbError) {

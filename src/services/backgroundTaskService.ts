@@ -74,7 +74,7 @@ class BackgroundTaskService {
 
       // Fetch all active users
       const { data: users, error: usersError } = await supabase
-        .from('users')
+        .from('user_preferences')
         .select('id, preferences')
         .order('id');
 
@@ -109,12 +109,19 @@ class BackgroundTaskService {
             tomorrow
           );
 
+          // Get user preferences
+          const { data: userData, error: userError } = await supabase
+            .from('user_preferences')
+            .select('preferences')
+            .eq('user_id', user.id)
+            .single();
+
           // Generate today's sparks if needed (during first window only)
           if (!hasSparkForToday && !isRetry) {
             console.log(`[BackgroundTaskService] Generating today's sparks for user: ${user.id}`);
             await sparkGeneratorService.generateDailySpark(
               user.id,
-              user.preferences || [],
+              userData?.preferences || [],
               'Prefer concise, interesting sparks that are easy to understand and ignite curiosity.'
             );
           }
@@ -124,7 +131,7 @@ class BackgroundTaskService {
             console.log(`[BackgroundTaskService] Generating tomorrow's sparks for user: ${user.id}`);
             await sparkGeneratorService.generateDailySpark(
               user.id,
-              user.preferences || [],
+              userData?.preferences || [],
               'Prefer concise, interesting sparks that are easy to understand and ignite curiosity.'
             );
           }

@@ -30,6 +30,7 @@ export const TopicPreferencesScreen: React.FC<Props> = ({ navigation }) => {
   const { theme } = useTheme();
   const [loading, setLoading] = useState(true);
   const [currentPreferences, setCurrentPreferences] = useState<Topic[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     loadCurrentPreferences();
@@ -42,9 +43,9 @@ export const TopicPreferencesScreen: React.FC<Props> = ({ navigation }) => {
       if (!user) return;
 
       const { data: userData, error } = await supabase
-        .from('users')
+        .from('user_preferences')
         .select('preferences')
-        .eq('id', user.id)
+        .eq('user_id', user.id)
         .single();
 
       if (error) throw error;
@@ -70,7 +71,7 @@ export const TopicPreferencesScreen: React.FC<Props> = ({ navigation }) => {
 
   const handleSavePreferences = async () => {
     try {
-      setLoading(true);
+      setIsSaving(true);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
@@ -89,7 +90,7 @@ export const TopicPreferencesScreen: React.FC<Props> = ({ navigation }) => {
       console.error('Error saving preferences:', error);
       Alert.alert('Error', 'Failed to save your preferences. Please try again.');
     } finally {
-      setLoading(false);
+      setIsSaving(false);
     }
   };
 
@@ -150,11 +151,11 @@ export const TopicPreferencesScreen: React.FC<Props> = ({ navigation }) => {
             styles.saveButton,
             {
               backgroundColor: theme.primary,
-              opacity: loading ? 0.7 : 1,
+              opacity: isSaving ? 0.7 : 1,
             }
           ]}
           onPress={handleSavePreferences}
-          disabled={loading}
+          disabled={isSaving}
         >
           <Text style={styles.saveButtonText}>
             Save Preferences

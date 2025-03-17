@@ -12,6 +12,7 @@ import {
   AppState,
   Platform,
   AppStateStatus,
+  SafeAreaView,
 } from 'react-native';
 import { sparkGeneratorService, DAILY_SPARK_KEY } from '../../services/sparkGenerator';
 import { supabase, supabaseApi } from '../../api/supabase';
@@ -162,9 +163,9 @@ export const FactScreen: React.FC<Props> = ({ route, navigation }) => {
       if (!user) return;
 
       const { data: userData, error } = await supabase
-        .from('users')
+        .from('user_preferences')
         .select('preferences')
-        .eq('id', user.id)
+        .eq('user_id', user.id)
         .single();
 
       if (error) throw error;

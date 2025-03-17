@@ -85,27 +85,27 @@ function AppContent(): React.JSX.Element {
         if (initialSession?.user) {
           console.log('Found existing session for user:', initialSession.user.id);
           const { data: userData, error: userError } = await supabase
-            .from('users')
+            .from('user_preferences')
             .select('preferences, created_at')
-            .eq('id', initialSession.user.id)
+            .eq('user_id', initialSession.user.id)
             .single();
           
           if (userError) throw userError;
 
           // Update last login
           await supabase
-            .from('users')
+            .from('user_preferences')
             .update({ last_login: new Date().toISOString() })
-            .eq('id', initialSession.user.id);
+            .eq('user_id', initialSession.user.id);
 
           setSession(initialSession);
           
           if (!userData) {
             console.log('No user data found, creating new profile');
             await supabase
-              .from('users')
+              .from('user_preferences')
               .insert([{
-                id: initialSession.user.id,
+                user_id: initialSession.user.id,
                 preferences: [],
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()
@@ -131,9 +131,9 @@ function AppContent(): React.JSX.Element {
           try {
             console.log('Checking user data for:', newSession.user.id);
             const { data: userData, error: userError } = await supabase
-              .from('users')
+              .from('user_preferences')
               .select('preferences, created_at')
-              .eq('id', newSession.user.id)
+              .eq('user_id', newSession.user.id)
               .single();
 
             if (userError) throw userError;
@@ -142,9 +142,9 @@ function AppContent(): React.JSX.Element {
             if (!userData) {
               console.log('Creating new user profile');
               await supabase
-                .from('users')
+                .from('user_preferences')
                 .insert([{
-                  id: newSession.user.id,
+                  user_id: newSession.user.id,
                   preferences: [],
                   created_at: new Date().toISOString(),
                   updated_at: new Date().toISOString()
@@ -160,6 +160,40 @@ function AppContent(): React.JSX.Element {
             setInitialRoute('Auth');
           }
         });
+
+        // Ensure user preferences exist in the DB if they're already authenticated
+        if (session?.user) {
+          // Check if user preferences exist
+          supabase
+            .from('user_preferences')
+            .select('*')
+            .eq('user_id', session.user.id)
+            .then(({ data, error }) => {
+              if (error) {
+                console.error('Error checking user preferences:', error);
+                return;
+              }
+
+              // If no user preferences, create default entry
+              if (!data || data.length === 0) {
+                supabase
+                  .from('user_preferences')
+                  .insert([
+                    { 
+                      user_id: session.user.id,
+                      preferences: [],
+                      created_at: new Date().toISOString(),
+                      updated_at: new Date().toISOString()
+                    }
+                  ])
+                  .then(({ error: insertError }) => {
+                    if (insertError) {
+                      console.error('Error creating user preferences:', insertError);
+                    }
+                  });
+              }
+            });
+        }
 
         setInitializing(false);
         

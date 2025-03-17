@@ -1,10 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@env';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { GeneratedRecommendation } from './openai';
 import { TOTAL_DAILY_SPARKS } from '../services/sparkGenerator';
+import ENV from '../config/env';
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+export const supabase = createClient(ENV.SUPABASE_URL, ENV.SUPABASE_ANON_KEY, {
   auth: {
     storage: AsyncStorage,
     autoRefreshToken: true,
@@ -17,7 +17,8 @@ export interface User {
   id: string;
   preferences: string[];
   created_at: string;
-  updated_at: string;
+  email?: string;  // Make email optional
+  updated_at?: string;  // Make updated_at optional
 }
 
 export interface Spark {
@@ -82,9 +83,9 @@ interface CheckAndSaveSparkParams {
 export const supabaseApi = {
   async saveUserPreferences(userId: string, preferences: string[]) {
     return await supabase
-      .from('users')
+      .from('user_preferences')
       .update({ preferences })
-      .eq('id', userId);
+      .eq('user_id', userId);
   },
 
   async saveSpark(spark: Omit<Spark, 'id' | 'created_at' | 'user_id'>, userId: string) {
