@@ -1,6 +1,5 @@
 # Incurio 🧠✨
 
-## TL;DR
 Infinitely Curious, Incurio, is an app to create intellectual motion. Every day, you'll receive 7 mind-bending sparks of knowledge across topics you love. Each spark is designed to make you go "what the fuck!?" and dive deeper into fascinating discoveries.
 
 ## Features
@@ -13,6 +12,9 @@ Infinitely Curious, Incurio, is an app to create intellectual motion. Every day,
 - 📱 Beautiful, gesture-based interface
 - 🔍 Search and revisit your favorite sparks
 
+## Demo
+[Demo Link](https://drive.google.com/file/d/1JTYFafjBKSZgxaj1qcUMea1s3bZID3L6/view?usp=drive_link)
+
 ## Wanna try it out?
 Reach out to:
 rachita.builds@gmail.com
@@ -21,8 +23,6 @@ rachita.builds@gmail.com
 - React Native
 - OpenAI
 - Supabase
-
-
 
 
 
